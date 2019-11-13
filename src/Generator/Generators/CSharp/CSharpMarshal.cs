@@ -101,11 +101,37 @@ namespace CppSharp.Generators.CSharp
                         }
                         else
                         {
-                            supportBefore.WriteLineIndent($@"{value}[i] = {Context.ReturnVarName}[i];");
+                            if (Context.Context.PolarFixesEnabled)
+                            {
+                                if (arrayType.IsPrimitiveType(PrimitiveType.Bool))
+                                    supportBefore.WriteLineIndent($@"{value}[i] = global::System.Convert.ToBoolean({
+                                        Context.ReturnVarName}[i]);");
+                                else if (arrayType.IsPrimitiveType(PrimitiveType.Char) &&
+                                         Context.Context.Options.MarshalCharAsManagedChar)
+                                    supportBefore.WriteLineIndent($@"{value}[i] = global::System.Convert.ToChar({
+                                        Context.ReturnVarName}[i]);");
+                                else
+                                    supportBefore.WriteLineIndent($@"{value}[i] = {
+                                        Context.ReturnVarName}[i];");
+                            }
+                            else
+                            {
+                                if (arrayType.IsPrimitiveType(PrimitiveType.Bool))
+                                    supportBefore.WriteLineIndent($@"{value}[i] = {
+                                        Context.ReturnVarName}[i] != 0;");
+                                else if (arrayType.IsPrimitiveType(PrimitiveType.Char) &&
+                                         Context.Context.Options.MarshalCharAsManagedChar)
+                                    supportBefore.WriteLineIndent($@"{value}[i] = global::System.Convert.ToChar({
+                                        Context.ReturnVarName}[i]);");
+                                else
+                                    supportBefore.WriteLineIndent($@"{value}[i] = {
+                                        Context.ReturnVarName}[i];");
+                            }
                         }
+                    }
                         supportBefore.UnindentAndWriteCloseBrace();
                         Context.Return.Write(value);
-                    }                    
+                    }
                     break;
                 case ArrayType.ArraySize.Incomplete:
                     // const char* and const char[] are the same so we can use a string
@@ -209,7 +235,15 @@ namespace CppSharp.Generators.CSharp
                     if (Context.MarshalKind == MarshalKind.NativeField)
                     {
                         // returned structs must be blittable and bool isn't
-                        Context.Return.Write("{0} != 0", Context.ReturnVarName);
+                        if (Context.Context.PolarFixesEnabled)
+                        {
+                            //Context.Return.Write("{0} != 0", Context.ReturnVarName);
+                            Context.Return.Write("global::System.Convert.ToBoolean({0})", Context.ReturnVarName);
+                        }
+                        else
+                        {
+                            Context.Return.Write("{0} != 0", Context.ReturnVarName);
+                        }
                         return true;
                     }
                     goto default;
@@ -338,7 +372,7 @@ namespace CppSharp.Generators.CSharp
         {
             var originalClass = @class.OriginalClass ?? @class;
             var ret = Generator.GeneratedIdentifier("result") + Context.ParameterIndex;
-        
+
             if (originalClass.IsRefType)
             {
                 var dtor = originalClass.Destructors.FirstOrDefault();
@@ -624,7 +658,15 @@ namespace CppSharp.Generators.CSharp
                     if (Context.MarshalKind == MarshalKind.NativeField)
                     {
                         // returned structs must be blittable and bool isn't
-                        Context.Return.Write("(byte) ({0} ? 1 : 0)", Context.Parameter.Name);
+                        if (Context.Context.PolarFixesEnabled)
+                        {
+                            Context.Return.Write("global::System.Convert.ToBoolean({0})", Context.Parameter.Name);
+                            //Context.Return.Write("(byte) ({0} ? 1 : 0)", Context.Parameter.Name);
+                        }
+                        else
+                        {
+                            Context.Return.Write("(byte) ({0} ? 1 : 0)", Context.Parameter.Name);
+                        }
                         return true;
                     }
                     goto default;

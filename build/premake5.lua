@@ -59,6 +59,7 @@ workspace "CppSharp"
       include (srcdir .. "/CppParser/ParserGen")
       include (srcdir .. "/Parser")
       include (srcdir .. "/CLI")
+    include (srcdir .. "/PolarCLI")
       include (srcdir .. "/Generator")
       include (srcdir .. "/Generator.Tests")
       include (srcdir .. "/Runtime")

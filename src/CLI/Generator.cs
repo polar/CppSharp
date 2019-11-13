@@ -156,6 +156,7 @@ namespace CppSharp
             driverOptions.OutputDir = options.OutputDir;
             driverOptions.CheckSymbols = options.CheckSymbols;
             driverOptions.Verbose = options.Verbose;
+            driver.Options.GenerateClassTemplates = true;
 
             if (!string.IsNullOrEmpty(options.Prefix))
                 driverOptions.GenerateName = name =>
