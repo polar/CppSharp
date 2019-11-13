@@ -965,7 +965,22 @@ namespace CppSharp.Generators.CSharp
                             Write("(object) ");
                     }
                 }
-                WriteLine($"{marshal.Context.ArgumentPrefix}{marshal.Context.Return};");
+                if (Context.PolarFixesEnabled)
+                {
+                    if (type.IsPrimitiveType(PrimitiveType.Bool))
+                    {
+                        WriteLine($"global::System.Convert.ToByte({marshal.Context.ArgumentPrefix}{marshal.Context.Return});");
+                    }
+                    else
+                    {
+                        WriteLine($"{marshal.Context.ArgumentPrefix}{marshal.Context.Return};");
+                    }
+                }
+                else
+                {
+                    WriteLine($"{marshal.Context.ArgumentPrefix}{marshal.Context.Return};");
+                }
+                
             }
 
             if ((arrayType != null && @class.IsValueType) || ctx.HasCodeBlock)
@@ -1402,19 +1417,38 @@ namespace CppSharp.Generators.CSharp
 
                     // check if overriding a property from a secondary base
                     Property rootBaseProperty;
-                    var isOverride = prop.IsOverride &&
+                    if (Context.PolarFixesEnabled)
+                    {
+                        var isOverride = prop.IsOverride /* &&
                         (rootBaseProperty = @class.GetBasePropertyByName(prop, true)) != null &&
-                        (rootBaseProperty.IsVirtual || rootBaseProperty.IsPure);
+                        (rootBaseProperty.IsVirtual || rootBaseProperty.IsPure) */;
 
-                    if (isOverride)
-                        Write("override ");
-                    else if (prop.IsPure)
-                        Write("abstract ");
+                        if (isOverride)
+                            Write("override ");
+                        else if (prop.IsPure)
+                            Write("abstract ");
 
-                    if (prop.IsVirtual && !isOverride && !prop.IsPure)
-                        Write("virtual ");
+                        if (prop.IsVirtual && !isOverride && !prop.IsPure)
+                            Write("virtual ");
 
-                    WriteLine($"{printedType} {GetPropertyName(prop)}");
+                        WriteLine($"{printedType} {GetPropertyName(prop)}");
+                    }
+                    else
+                    {
+                        var isOverride = prop.IsOverride &&
+                                         (rootBaseProperty = @class.GetBasePropertyByName(prop, true)) != null &&
+                                         (rootBaseProperty.IsVirtual || rootBaseProperty.IsPure);
+
+                        if (isOverride)
+                            Write("override ");
+                        else if (prop.IsPure)
+                            Write("abstract ");
+
+                        if (prop.IsVirtual && !isOverride && !prop.IsPure)
+                            Write("virtual ");
+
+                        WriteLine($"{printedType} {GetPropertyName(prop)}");
+                    }
                 }
                 else
                 {
@@ -2459,10 +2493,14 @@ namespace CppSharp.Generators.CSharp
                 }
                 if (specializedMethod.Ignore)
                 {
+                    /*
                     WriteLine($@"throw new MissingMethodException(""Method {
                         method.Name} ignored in specialization {
                         @class.Visit(TypePrinter)}."");");
                     return;
+                    */
+                    Console.WriteLine(
+                        $@"Supposed to be ignoring specialization {method.Name} {@class.Visit(TypePrinter)}.");
                 }
 
                 method = specializedMethod;

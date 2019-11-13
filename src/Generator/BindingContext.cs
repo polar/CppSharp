@@ -19,6 +19,8 @@ namespace CppSharp.Generators
         public PassBuilder<TranslationUnitPass> TranslationUnitPasses { get; }
         public PassBuilder<GeneratorOutputPass> GeneratorOutputPasses { get; }
 
+        public bool PolarFixesEnabled = false;
+
         public BindingContext(DriverOptions options, ParserOptions parserOptions = null)
         {
             Options = options;

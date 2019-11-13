@@ -18,7 +18,7 @@ namespace CppSharp
         /// Specifies the VS version.
         /// </summary>
         /// <remarks>When null, latest is used.</remarks>
-        public VisualStudioVersion VsVersion;
+//        public VisualStudioVersion VsVersion;
 
         // If code compilation is enabled, then sets the compilation target.
         public CompilationTarget Target;

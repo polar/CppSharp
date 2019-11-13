@@ -154,9 +154,18 @@ namespace CppSharp.Types.Std
                 return new CustomType(typePrinter.IntPtrType);
             }
 
-            if (Context.Options.Encoding == Encoding.ASCII ||
-                Context.Options.Encoding == Encoding.UTF8)
-                return new CustomType("[MarshalAs(UnmanagedType.LPUTF8Str)] string");
+            if (Context.PolarFixesEnabled)
+            {
+                if (Context.Options.Encoding == Encoding.ASCII ||
+                    Context.Options.Encoding == Encoding.UTF8)
+                    return new CustomType("[MarshalAs(UnmanagedType.LPStr)] string");
+            }
+            else
+            {
+                if (Context.Options.Encoding == Encoding.ASCII ||
+                    Context.Options.Encoding == Encoding.UTF8)
+                    return new CustomType("[MarshalAs(UnmanagedType.LPUTF8Str)] string");
+            }
 
             if (Context.Options.Encoding == Encoding.Unicode ||
                 Context.Options.Encoding == Encoding.BigEndianUnicode)
@@ -361,8 +370,16 @@ namespace CppSharp.Types.Std
                 var varBasicString = $"__basicString{ctx.ParameterIndex}";
                 ctx.Before.WriteLine($@"var {varBasicString} = new {
                     basicString.Visit(typePrinter)}();");
-                ctx.Before.WriteLine($@"{qualifiedBasicString}Extensions.{
-                    assign.Name}({varBasicString}, {ctx.Parameter.Name});");
+                if (Context.PolarFixesEnabled)
+                {
+                    ctx.Before.WriteLine($@"{qualifiedBasicString}Extensions.{
+                        assign.Name}({varBasicString}, (string) (object) {ctx.Parameter.Name});");
+                }
+                else
+                {
+                    ctx.Before.WriteLine($@"{qualifiedBasicString}Extensions.{
+                        assign.Name}({varBasicString}, {ctx.Parameter.Name});");
+                }
                 ctx.Return.Write($"{varBasicString}.{Helpers.InstanceIdentifier}");
                 if (!type.IsPointer() || ctx.Parameter.IsIndirect)
                     ctx.Cleanup.WriteLine($@"{varBasicString}.Dispose({
@@ -384,17 +401,36 @@ namespace CppSharp.Types.Std
                 basicString.Visit(typePrinter)}.{Helpers.CreateInstanceIdentifier}({
                 (usePointer ? string.Empty : $"new {typePrinter.IntPtrType}(&")}{
                  ctx.ReturnVarName}{(usePointer ? string.Empty : ")")});");
-            string @string = $"{qualifiedBasicString}Extensions.{data.Name}({varBasicString})";
-            if (usePointer)
+            if (Context.PolarFixesEnabled)
             {
-                ctx.Return.Write(@string);
+                string @string1 = $"{qualifiedBasicString}Extensions.{data.Name}({varBasicString})";
+                string @string = $"new System.String({@string1})";
+                if (usePointer)
+                {
+                    ctx.Return.Write(@string);
+                }
+                else
+                {
+                    string retString = $"{Generators.Generator.GeneratedIdentifier("retString")}{ctx.ParameterIndex}";
+                    ctx.Before.WriteLine($"var {retString} = {@string};");
+                    ctx.Before.WriteLine($"{varBasicString}.Dispose();");
+                    ctx.Return.Write(retString);
+                }
             }
             else
             {
-                string retString = $"{Generator.GeneratedIdentifier("retString")}{ctx.ParameterIndex}";
-                ctx.Before.WriteLine($"var {retString} = {@string};");
-                ctx.Before.WriteLine($"{varBasicString}.Dispose();");
-                ctx.Return.Write(retString);
+                string @string = $"{qualifiedBasicString}Extensions.{data.Name}({varBasicString})";
+                if (usePointer)
+                {
+                    ctx.Return.Write(@string);
+                }
+                else
+                {
+                    string retString = $"{Generator.GeneratedIdentifier("retString")}{ctx.ParameterIndex}";
+                    ctx.Before.WriteLine($"var {retString} = {@string};");
+                    ctx.Before.WriteLine($"{varBasicString}.Dispose();");
+                    ctx.Return.Write(retString);
+                }
             }
         }
 

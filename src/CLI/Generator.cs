@@ -182,6 +182,7 @@ namespace CppSharp
             driverOptions.OutputDir = options.OutputDir;
             driverOptions.CheckSymbols = options.CheckSymbols;
             driverOptions.Verbose = options.Verbose;
+            driver.Options.GenerateClassTemplates = true;
         }
 
         private void SetupLinuxOptions(ParserOptions parserOptions)
