@@ -385,30 +385,35 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
                 var vectorHolderName = $"_vectorHolder{ctx.ParameterIndex}";
                 var vectorItName = $"_vi{ctx.ParameterIndex}";
                 ctx.Before.WriteLine($@"var {vectorHolderName} = new VectorHolder<{insideTypeName}>();");
-                ctx.Before.WriteLine($@"foreach(var {vectorItName} in {ctx.Parameter.Name})");
-                ctx.Before.WriteOpenBraceAndIndent();
-                if (!IsPrimitiveType(insideType.Type))
+                if (ctx.Parameter.Usage != ParameterUsage.Out)
                 {
-                    if (insideTypeName == "string")
+                    ctx.Before.WriteLine($@"foreach(var {vectorItName} in {ctx.Parameter.Name})");
+                    ctx.Before.WriteOpenBraceAndIndent();
+                    if (!IsPrimitiveType(insideType.Type))
                     {
-                        var vectorSName = $"_viS{ctx.ParameterIndex}";
-                        ctx.Before.WriteLine(
-                            $@"var {vectorSName} = new global::std.basic_string<sbyte, global::std.char_traits<sbyte>, global::std.allocator<sbyte>>();");
-                        ctx.Before.WriteLine(
-                            $@"global::std.basic_stringExtensions.assign({vectorSName}, (string) (object) {vectorItName});");
-                        ctx.Before.WriteLine($@"{vectorHolderName}.addByRef({vectorSName}.__Instance);");
-                        ctx.Before.WriteLine($@"{vectorSName}.Dispose();");
+                        if (insideTypeName == "string")
+                        {
+                            var vectorSName = $"_viS{ctx.ParameterIndex}";
+                            ctx.Before.WriteLine(
+                                $@"var {vectorSName} = new global::std.basic_string<sbyte, global::std.char_traits<sbyte>, global::std.allocator<sbyte>>();");
+                            ctx.Before.WriteLine(
+                                $@"global::std.basic_stringExtensions.assign({vectorSName}, (string) (object) {vectorItName});");
+                            ctx.Before.WriteLine($@"{vectorHolderName}.addByRef({vectorSName}.__Instance);");
+                            ctx.Before.WriteLine($@"{vectorSName}.Dispose();");
+                        }
+                        else
+                        {
+                            ctx.Before.WriteLine($@"{vectorHolderName}.addByRef({vectorItName}.__Instance);");
+                        }
                     }
                     else
                     {
-                        ctx.Before.WriteLine($@"{vectorHolderName}.addByRef({vectorItName}.__Instance);");
+                        ctx.Before.WriteLine($@"{vectorHolderName}.add({vectorItName});");
                     }
+
+                    ctx.Before.UnindentAndWriteCloseBrace();
                 }
-                else
-                {
-                    ctx.Before.WriteLine($@"{vectorHolderName}.add({vectorItName});");
-                }
-                ctx.Before.UnindentAndWriteCloseBrace();
+
                 var pointerType = type as PointerType;
                 if (pointerType != null)
                 {
@@ -417,6 +422,16 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
                 else
                 {
                     ctx.Return.Write($"*({typePrinter.PrintNative(basicString)}*){vectorHolderName}.@ref()");
+                }
+
+                if (ctx.Parameter.Usage == ParameterUsage.Out)
+                {
+                    ctx.Cleanup.WriteLine($@"{ctx.Parameter.Name} = {vectorHolderName}.getList();");
+                }
+
+                if (ctx.Parameter.Usage == ParameterUsage.InOut)
+                {
+                    ctx.Cleanup.WriteLine($@"{vectorHolderName}.assignToList({ctx.Parameter.Name});");
                 }
                 if (!type.IsPointer() || ctx.Parameter.IsIndirect)
                     ctx.Cleanup.WriteLine($@"{vectorHolderName}.Dispose({
@@ -466,8 +481,17 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
                 var createFunction = getCreateFunction(insideTypeName);
                 ctx.Before.WriteLine($@"var {listName} = ALK.Interop.Utils.toList<{insideTypeName}>({createFunction}, {itemSizeName}, {vectorName});");
             }
-            
-            ctx.Return.Write("{0}", listName);
+
+            var returnName = listName;
+            if (ctx.Parameter != null && ctx.Parameter.Usage == ParameterUsage.Out)
+            {
+                ctx.Before.WriteLine($@"var {ctx.ReturnVarName} = {listName};");
+                ctx.Return.Write(string.Empty);
+            }
+            else
+            {    
+                ctx.Return.Write("{0}", listName);
+            }
         } 
         List<string> prims = new List<string>() {"bool", "byte","sbyte","int","uint","short","ushort","long", "ulong", "float", "double"};
 
@@ -571,6 +595,344 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
                 return "ALK.Interop.Utils.stringP";
             }
             return $"{typeName}.__CreateInstance";
+        }
+
+        private static string GetQualifiedBasicString(ClassTemplateSpecialization basicString)
+        {
+            var declContext = basicString.TemplatedDecl.TemplatedDecl;
+            var names = new Stack<string>();
+            while (!(declContext is TranslationUnit))
+            {
+                var isInlineNamespace = declContext is Namespace && ((Namespace)declContext).IsInline;
+                if (!isInlineNamespace)
+                    names.Push(declContext.Name);
+                declContext = declContext.Namespace;
+            }
+            var qualifiedBasicString = string.Join(".", names);
+            // TODO:: Wonder why this isn't coming out as ALK.Interop
+            return $"global::ALK.Interop.{qualifiedBasicString}";
+        }
+
+        public static ClassTemplateSpecialization GetBasicString(Type type)
+        {
+            var desugared = type.Desugar();
+            var template = (desugared.GetFinalPointee() ?? desugared).Desugar();
+            var templateSpecializationType = template as TemplateSpecializationType;
+            if (templateSpecializationType != null)
+                return templateSpecializationType.GetClassTemplateSpecialization();
+            return (ClassTemplateSpecialization) ((TagType) template).Declaration;
+        }
+    }
+    
+
+    [TypeMap("std::tuple", GeneratorKind = GeneratorKind.CSharp)]
+    public class Map : TypeMap
+    {
+        public override bool IsIgnored { get { return false; } }
+
+        public override Type CLISignatureType(TypePrinterContext ctx)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public override void CLIMarshalToNative(MarshalContext ctx)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public override void CLIMarshalToManaged(MarshalContext ctx)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public override Type CSharpSignatureType(TypePrinterContext ctx)
+        {
+            if (ctx.Kind == TypePrinterContextKind.Native)
+            {
+                ClassTemplateSpecialization basicString = GetBasicString(ctx.Type);
+                var typePrinter = new CSharpTypePrinter(null);
+                typePrinter.PushContext(TypePrinterContextKind.Native);
+                return new CustomType(basicString.Visit(typePrinter).Type);
+            }
+
+
+            var type = Type as TemplateSpecializationType;
+            string typeString = "System.Tuple<";
+            bool first = true;
+            foreach (var x in type.Arguments)
+            {
+                if (first)
+                    first = false;
+                else
+                    typeString += ",";
+                typeString += x.Type;
+            }
+
+            typeString += ">"; 
+            return new CustomType(typeString);
+        }
+        
+        public bool IsPrimitiveType(Type type)
+        {
+            if (type == null)
+                return false;
+            if (type is BuiltinType)
+            {
+                var primitiveType = (type as BuiltinType).Type;
+                return primitiveType != PrimitiveType.String;
+            }
+            if (type is TagType)
+            {
+                Enumeration decl = (type as TagType).Declaration as Enumeration;
+                if (decl != null)
+                    return IsPrimitiveType(decl.Type);
+            }
+
+            if (type is TypedefType)
+            {
+                TypedefNameDecl decl = (type as TypedefType).Declaration;
+                if (decl != null)
+                    return IsPrimitiveType(decl.Type);
+            }
+            return false;
+        }
+
+        private string parameterString(CSharpTypePrinter typePrinter, List<QualifiedType> types)
+        {
+            string typeString = "";
+            bool first = true;
+            foreach (var x in types)
+            {
+                if (first)
+                    first = false;
+                else
+                    typeString += ",";
+                typeString += x.Type.Visit(typePrinter);
+            }
+            return typeString;
+        }
+        public string getCreateFunction(string typeName)
+        {
+            if (typeName == "bool")
+            {
+                return "ALK.Interop.Utils.boolP";
+            }
+            if (typeName == "byte")
+            {
+                return "ALK.Interop.Utils.byteP";
+            }
+            if (typeName == "sbyte")
+            {
+                return "ALK.Interop.Utils.sbyteP";
+            }
+            if (typeName == "int")
+            {
+                return "ALK.Interop.Utils.intP";
+            }
+            if (typeName == "uint")
+            {
+                return "ALK.Interop.Utils.uintP";
+            }
+            if (typeName == "short")
+            {
+                return "ALK.Interop.Utils.shortP";
+            }
+            if (typeName == "ushort")
+            {
+                return "ALK.Interop.Utils.ushortP";
+            }
+            if (typeName == "long")
+            {
+                return "ALK.Interop.Utils.longP";
+            }
+            if (typeName == "ulong")
+            {
+                return "ALK.Interop.Utils.ulongP";
+            }
+            if (typeName == "float")
+            {
+                return "ALK.Interop.Utils.floatP";
+            }
+            if (typeName == "double")
+            {
+                return "ALK.Interop.Utils.doubleP";
+            }
+            if (typeName == "string")
+            {
+                return "ALK.Interop.Utils.stringP";
+            }
+            return $"{typeName}.__CreateInstance";
+        }
+
+        
+        public override void CSharpMarshalToNative(CSharpMarshalContext ctx)
+        {
+            var templateType = Type as TemplateSpecializationType;
+            var insideTypes = templateType.Arguments.ConvertAll(x => x.Type);
+            var count = insideTypes.Count;
+            var typePrinter = new CSharpTypePrinter(ctx.Context);
+            var paramString = parameterString(typePrinter, insideTypes);
+            Type type = ctx.Parameter.Type.Desugar();
+            ClassTemplateSpecialization basicString = GetBasicString(type);
+            //if (!ctx.Parameter.Type.Desugar().IsAddress() &&
+            //    ctx.MarshalKind != MarshalKind.NativeField)
+            //    ctx.Return.Write($"*({typePrinter.PrintNative(basicString)}*) ");
+            string qualifiedBasicString = GetQualifiedBasicString(basicString);
+            if (ctx.MarshalKind == MarshalKind.NativeField)
+            {
+                var vectorLocation = $"new System.IntPtr(&{ctx.ReturnVarName})";
+                var newVector = $"new {typePrinter.PrintNative(basicString)}()";
+                var newVectorHolder = $"new Tuple{count}Holder<{paramString}>()";
+                
+                var vectorPointerName = $"_vectorPtr{ctx.ParameterIndex}";
+                var vectorHolderName = $"_vectorHolder{ctx.ParameterIndex}";
+                for (var i = 1; i <= count; i++)
+                {
+                    ctx.Before.WriteLine($@"{vectorHolderName}.set{i}({ctx.Parameter.Name}.Item{i});");
+                }
+            	ctx.ReturnVarName = string.Empty;
+            }
+            else
+            {
+                var vectorHolderName = $"_tuple{count}Holder{ctx.ParameterIndex}";
+                var vectorItName = ctx.Parameter.Name;
+                if (ctx.Parameter.Usage != ParameterUsage.Out)
+                {
+                    for (int i = 0; i < count; i++)
+                    {
+                        var itemName = $"__tuple{ctx.ParameterIndex}_item{i}";
+                        var insideTypeName = insideTypes[i].Visit(typePrinter);
+                        if (!IsPrimitiveType(insideTypes[i].Type))
+                        {
+                            if (insideTypeName == "string")
+                            {
+                                var vectorSName = $"_viS{ctx.ParameterIndex}_item{i}";
+                                ctx.Before.WriteLine(
+                                    $@"var {vectorSName} = new global::std.basic_string<sbyte, global::std.char_traits<sbyte>, global::std.allocator<sbyte>>();");
+                                ctx.Before.WriteLine(
+                                    $@"global::std.basic_stringExtensions.assign({vectorSName}, (string) (object) {vectorItName}.Item{i+1});");
+                                ctx.Before.WriteLine($@"var {itemName} = {vectorSName}.Item{i+1}.__Instance;");
+                                ctx.Cleanup.WriteLine($@"{vectorSName}.Dispose();");
+                            }
+                            else
+                            {
+                                ctx.Before.WriteLine($@"var {itemName} = {vectorItName}.Item{i+1}.__Instance;");
+                            }
+                        }
+                        else
+                        {
+                            ctx.Before.WriteLine($@"var {itemName} = {vectorItName}.Item{i+1};");
+                        }
+                    }
+                }
+                ctx.Before.Write(
+                    $@"var {vectorHolderName} = new Tuple{count}Holder<{paramString}>(");
+                bool first = true;
+                for (var i = 0; i < count; i++)
+                {
+                    if (first)
+                    {
+                        first = false;
+                    }
+                    else
+                    {
+                        ctx.Before.Write(",");
+                    }
+
+                    ctx.Before.Write($@"__tuple{ctx.ParameterIndex}_item{i}");
+                }
+
+                ctx.Before.WriteLine(");");
+
+                var pointerType = type as PointerType;
+                if (pointerType != null)
+                {
+                    ctx.Return.Write($"{vectorHolderName}.@ref()");
+                }
+                else
+                {
+                    ctx.Return.Write($"*({typePrinter.PrintNative(basicString)}*){vectorHolderName}.@ref()");
+                }
+
+                if (ctx.Parameter.Usage == ParameterUsage.Out)
+                {
+                    ctx.Cleanup.WriteLine($@"{ctx.Parameter.Name} = {vectorHolderName}.getTuple();");
+                }
+
+                if (ctx.Parameter.Usage == ParameterUsage.InOut)
+                {
+                    ctx.Cleanup.WriteLine($@"{vectorHolderName}.assignToTuple({ctx.Parameter.Name});");
+                }
+
+                if (!type.IsPointer() || ctx.Parameter.IsIndirect)
+                    ctx.Cleanup.WriteLine($@"{vectorHolderName}.Dispose({
+                        (ctx.MarshalKind == MarshalKind.NativeField ? "false" : string.Empty)});");
+            }
+        }
+
+        public override void CSharpMarshalToManaged(CSharpMarshalContext ctx)
+        {
+            var templateType = Type as TemplateSpecializationType;
+            var insideTypes = templateType.Arguments.ConvertAll(x => x.Type);
+            var count = insideTypes.Count;
+            var typePrinter = new CSharpTypePrinter(ctx.Context);
+            var paramString = parameterString(typePrinter, insideTypes);
+            ClassTemplateSpecialization basicString = GetBasicString(templateType);
+
+            throw new System.Exception($@"Cannot marshal a native std::tuple<{paramString}> to a managed entity. Please use Tuple{count}Holder instead.");
+
+            /*
+            var typeCast = $"({typePrinter.PrintNative(basicString)})";
+            // So we have the case that when the arg name is not generated, i.e. "_ret", its ReturnVarName is
+            // a System.IntPtr of an already typecasted value, i.e. a property, etc. This would be for the
+            // return of a function std::vector<?> someFunction(....). 
+            // If it is for a function return or a parameter return we need the dereferenced type cast.
+            if (ctx.ReturnVarName != ctx.ArgName)
+            {
+                typeCast = $"*({typePrinter.PrintNative(basicString)}*)";
+            }
+            var vectorName = $"__std_tuple{ctx.ParameterIndex}";
+            var listName = $"__Tuple{ctx.ParameterIndex}";
+
+            var baseImplName = $@"{listName}_M_head_impl";
+            ctx.Before.WriteLine($@"var {baseImplName} =  new System.IntPtr(({typeCast}{ctx.ReturnVarName})._M_head_impl);");
+            for (var i = 0; i < count; i++)
+            {
+                var implName = i > 0 ? $"_M_head_impl{i}" : "_M_head_impl"; 
+                ctx.Before.WriteLine($@"var {listName}_{i} = {baseImplName}.Add(({typeCast}{ctx.ReturnVarName}).{implName});");
+                var createFunction = getCreateFunction(insideTypes[i].Visit(typePrinter));
+                ctx.Before.WriteLine($@"var {listName}_Item{i} = {createFunction}({listName}_{i});");
+            }
+
+            ctx.Before.Write($@"var {listName} = new System.Tuple<{paramString}>(");
+            bool first = true;
+            for (var i = 0; i < count; i++)
+            {
+                if (first)
+                {
+                    first = false;
+                }
+                else
+                {
+                    ctx.Before.Write(",");
+                }
+
+                ctx.Before.Write($@"{listName}_Item{i}");
+            }
+
+            ctx.Before.WriteLine(");");
+
+            var returnName = listName;
+            if (ctx.Parameter != null && ctx.Parameter.Usage == ParameterUsage.Out)
+            {
+                ctx.Before.WriteLine($@"var {ctx.ReturnVarName} = {listName};");
+                ctx.Return.Write(string.Empty);
+            }
+            else
+            {    
+                ctx.Return.Write("{0}", listName);
+            }
+            */
         }
 
         private static string GetQualifiedBasicString(ClassTemplateSpecialization basicString)

@@ -25,7 +25,8 @@ namespace CppSharp.Passes
             WriteLine("#define _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS");
             WriteLine("#define _LIBCPP_HIDE_FROM_ABI");
             NewLine();
-            WriteLine("#include \"/home/polar/src/trimble/core/dotnet/Libraries/ALK.CLI.Interop/linux/modules/Interop/VectorHolder.hpp\"");
+            WriteLine("#include \"{0}\"", ((PolarDriverOptions)Context.Options).VectorHolderPath);
+            WriteLine("#include \"/home/polar/RiderProjects/ALK.Interop/ALK.Interop/CppAPI/Interop/Tuple3Holder.hpp\"");
             foreach (var module in Options.Modules)
             {
                 if (module != Options.SystemModule && module.LibraryName != "Ext")
@@ -36,7 +37,22 @@ namespace CppSharp.Passes
             }
             NewLine();
         }
-
+        
+        private string parameterString(List<QualifiedType> types)
+        {
+            string typeString = "";
+            bool first = true;
+            foreach (var x in types)
+            {
+                if (first)
+                    first = false;
+                else
+                    typeString += ",";
+                typeString += x.Type.Visit(cppTypePrinter);
+            }
+            return typeString;
+        }
+        
         public override bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecialization specialization)
         {
             if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "std::vector")
@@ -45,6 +61,15 @@ namespace CppSharp.Passes
                 string typeName = itemType.Visit(cppTypePrinter);
                 string strName = Regex.Replace(typeName, @"[:<>&*, .]", "_");
                 WriteLine($"struct ___{strName} {{void foo(VectorHolder<{typeName}> _);}};");
+                //WriteLine($"template class VectorHolder<{itemType.Visit(cppTypePrinter)}>;");
+            }
+            else if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "std::tuple")
+            {
+                var itemTypes = specialization.Arguments.ConvertAll(x => x.Type);
+                var count = itemTypes.Count;
+                string typeName = parameterString(itemTypes);
+                string strName = Regex.Replace(typeName, @"[:<>&*, .]", "_");
+                WriteLine($"struct ___{strName} {{void foo(Tuple{count}Holder<{typeName}> _);}};");
                 //WriteLine($"template class VectorHolder<{itemType.Visit(cppTypePrinter)}>;");
             }
             else if (!specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName.StartsWith("std::"))

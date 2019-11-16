@@ -16,6 +16,7 @@ namespace CppSharp
         {
             var showHelp = false;
 
+            optionSet.Add("V=", "the Full {PATH} of VectorHolder.hpp", (i) => { SetVectorHolderPath(i); });
             optionSet.Add("I=", "the {PATH} of a folder to search for include files", (i) => { AddIncludeDirs(i, errorMessages); });
             optionSet.Add("L=", "the {PATH} of a folder to search for additional libraries", l => driver.AddLibraryDirectory(l) );
             optionSet.Add("D:", "additional define with (optional) value to add to be used while parsing the given header files", (n, v) => AddDefine(n, v, errorMessages) );
@@ -103,6 +104,11 @@ namespace CppSharp
             }
         }
 
+        static void SetVectorHolderPath(string path)
+        {
+            driver.SetVectorHolderPath(path);
+        }
+        
         static void AddArgument(string value, List<string> errorMessages)
         {
              driver.AddParserArgument(value);

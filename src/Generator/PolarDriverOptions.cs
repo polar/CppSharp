@@ -15,5 +15,11 @@ namespace CppSharp
             Modules.Add(module);
             return module;
         }
+
+        public  string VectorHolderPath;
+        public void SetVectorHolderPath(string path)
+        {
+            VectorHolderPath = path;
+        }
     }
 }
