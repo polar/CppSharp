@@ -3049,15 +3049,36 @@ namespace CppSharp.Generators.CSharp
             var argName = Generator.GeneratedIdentifier("arg") + paramIndex.ToString(CultureInfo.InvariantCulture);
             var paramMarshal = new ParamMarshal { Name = argName, Param = param };
 
-            if (param.IsOut || param.IsInOut)
+            if (Context.PolarFixesEnabled)
             {
                 var paramType = param.Type;
-
-                Class @class;
-                if ((paramType.GetFinalPointee() ?? paramType).Desugar().TryGetClass(out @class))
+                // We do not assign a new something for a ref. We'd wipe it out.
+                if (param.IsOut)
                 {
-                    var qualifiedIdentifier = (@class.OriginalClass ?? @class).Visit(TypePrinter);
-                    WriteLine("{0} = new {1}();", name, qualifiedIdentifier);
+                    // This might be good for std::vector. Not sure. But I think we actually want the CSharpTypeSignature Managed.
+                    var qualifiedIdentifier = (paramType.GetFinalPointee() ?? paramType).Visit(TypePrinter);
+                    // This doesn't work for strings.
+                    if (qualifiedIdentifier != "string")
+                    {
+                        WriteLine("{0} = new {1}();", name, qualifiedIdentifier);
+                    }
+                    else
+                    {
+                        WriteLine("//{0} = new {1}();", name, qualifiedIdentifier);
+                    }
+                }
+            }
+            else
+            {
+                if (param.IsOut || param.IsInOut)
+                {
+                    var paramType = param.Type;
+                    Class @class;
+                    if ((paramType.GetFinalPointee() ?? paramType).Desugar().TryGetClass(out @class))
+                    {
+                        var qualifiedIdentifier = (@class.OriginalClass ?? @class).Visit(TypePrinter);
+                        WriteLine("{0} = new {1}();", name, qualifiedIdentifier);
+                    }
                 }
             }
 

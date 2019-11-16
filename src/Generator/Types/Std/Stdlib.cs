@@ -372,8 +372,16 @@ namespace CppSharp.Types.Std
                     basicString.Visit(typePrinter)}();");
                 if (Context.PolarFixesEnabled)
                 {
-                    ctx.Before.WriteLine($@"{qualifiedBasicString}Extensions.{
-                        assign.Name}({varBasicString}, (string) (object) {ctx.Parameter.Name});");
+                    // If it's an out parameter, we do not assign it with anything.
+                    if (ctx.Parameter.Usage != ParameterUsage.Out)
+                    {
+                        ctx.Before.WriteLine($@"{qualifiedBasicString}Extensions.{
+                            assign.Name}({varBasicString}, (string) (object) {ctx.Parameter.Name});");
+                    }
+                    if (ctx.Parameter.Usage == ParameterUsage.Out || ctx.Parameter.Usage == ParameterUsage.InOut)
+                    {
+                        ctx.Cleanup.WriteLine($@"{ctx.Parameter.Name} = new System.String({qualifiedBasicString}Extensions.data({varBasicString}));");
+                    }
                 }
                 else
                 {

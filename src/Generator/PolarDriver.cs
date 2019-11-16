@@ -35,13 +35,17 @@ namespace CppSharp
             Context = new BindingContext(DriverOptions, ParserOptions);
             Context.PolarFixesEnabled = true;
             ExtModule.SymbolsLibraryName = "Ext-symbols";
-            ExtModule.Headers.Add(
-                "/home/polar/src/trimble/core/dotnet/Libraries/ALK.CLI.Interop/linux/modules/Interop/VectorHolder.hpp");
             DriverOptions.AddModule(ExtModule);
             DriverOptions.GenerateClassTemplates = true;
             DriverOptions.UseHeaderDirectories = false;
         }
 
+        public void SetVectorHolderPath(string path)
+        {
+            DriverOptions.SetVectorHolderPath(path);
+            ExtModule.Headers.Add(path);
+            ExtModule.Headers.Add("/home/polar/RiderProjects/ALK.Interop/ALK.Interop/CppAPI/Interop/Tuple3Holder.hpp");
+        }
         public void setOutputDirectory(string dir)
         {
             DriverOptions.OutputDir = dir;
@@ -273,7 +277,7 @@ namespace CppSharp
             TranslationUnitPasses.AddPass(new FunctionToInstanceMethodPass());
             TranslationUnitPasses.AddPass(new MarshalPrimitivePointersAsRefTypePass());
             TranslationUnitPasses.AddPass(new FindSymbolsPass());
-            TranslationUnitPasses.AddPass(new CheckMacroPass());
+            TranslationUnitPasses.AddPass(new PolarCheckMacroPass());
             TranslationUnitPasses.AddPass(new CheckStaticClass());
             TranslationUnitPasses.AddPass(new MoveFunctionToClassPass());
             TranslationUnitPasses.AddPass(new CheckAmbiguousFunctions());
