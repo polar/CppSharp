@@ -21,5 +21,25 @@ namespace CppSharp
         {
             VectorHolderPath = path;
         }
+
+        public string VectorHolderName;
+
+        public void SetVectorHolderName(string name)
+        {
+            VectorHolderName = name;
+        }
+
+        public  string OptionalPath;
+        public void SetOptionalPath(string path)
+        {
+            OptionalPath = path;
+        }
+
+        public string OptionalName;
+
+        public void SetOptionalName(string name)
+        {
+            OptionalName = name;
+        }
     }
 }

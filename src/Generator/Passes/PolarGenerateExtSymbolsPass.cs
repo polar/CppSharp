@@ -137,12 +137,19 @@ namespace CppSharp.Passes
         {
             if (a.Type.Type == null ||
                 ASTUtils.IsTypeExternal(specialization.TranslationUnit.Module, a.Type.Type))
+            {
+                System.Console.WriteLine($"UnspportedTemplateArgument External {a.Type.Type}!");
                 return true;
+            }
 
             var typeIgnoreChecker = new TypeIgnoreChecker(typeMaps);
             a.Type.Type.Visit(typeIgnoreChecker);
+            System.Console.WriteLine($"UnspportedTemplateArgument {a.Type.Type} isIgnored {typeIgnoreChecker.IsIgnored}!");
             return typeIgnoreChecker.IsIgnored;
         }
+        // The purpuse of this class is to see if we need to specialize a vector class.
+        // Since we are generating a library, we want all possible classes, so if one doesn't exist
+        // then add by returnning true.
         private static bool IsVectorSpecializationNeeded(Declaration container,
             ITypeMapDatabase typeMaps, bool internalOnly, AST.Type type,
             ClassTemplateSpecialization specialization)
@@ -152,6 +159,8 @@ namespace CppSharp.Passes
 
             if (typeMap != null)
             {
+                var typePrinter = new CppSharp.Generators.CSharp.CSharpTypePrinter(typeMap.Context); 
+                System.Console.WriteLine($"IsVectorSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
                 if (typeMap is CppSharp.Types.Ext.Vector)
                 {
                     if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "std::vector")
@@ -159,8 +168,33 @@ namespace CppSharp.Passes
                         if (specialization.Arguments.Any(a => UnsupportedTemplateArgument(
                             specialization, a, typeMaps)))
                         {
-                            return false; // Need to return opposite.
+                            System.Console.WriteLine($"IsVectorSpecializationNeeded: Returning false for {specialization.Visit(typePrinter).Type}");
+                            return false;
                         }
+                    }
+                }
+            }
+            return true;
+        }
+        private static bool IsOptionalSpecializationNeeded(Declaration container,
+            ITypeMapDatabase typeMaps, bool internalOnly, AST.Type type,
+            ClassTemplateSpecialization specialization)
+        {
+            TypeMap typeMap;
+            typeMaps.FindTypeMap(type, out typeMap);
+
+            if (typeMap != null)
+            {
+                var typePrinter = new CppSharp.Generators.CSharp.CSharpTypePrinter(typeMap.Context); 
+                System.Console.WriteLine($"IsOptionalSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
+                
+                if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "Interop::Optional")
+                {
+                    if (specialization.Arguments.Any(a => UnsupportedTemplateArgument(
+                        specialization, a, typeMaps)))
+                    {
+                        System.Console.WriteLine($"IsOptionalSpecializationNeeded: Returning false for  {specialization.Visit(typePrinter).Type}");
+                        return false;
                     }
                 }
             }
@@ -181,6 +215,34 @@ namespace CppSharp.Passes
                     return true;
 
                 if (IsVectorSpecializationNeeded(container, typeMaps, internalOnly,
+                    type, specialization))
+                    return false;
+
+                if (!ASTUtils.CheckTypeForSpecialization(specialization.Arguments[0].Type.Type, specialization, addSpecialization,
+                    typeMaps, internalOnly))
+                    return false;
+
+                addSpecialization(specialization);
+                return true;
+            }
+
+            return false;
+        }
+        
+        public static bool CheckTypeForOptionalSpecialization(AST.Type type, Declaration container,
+            Action<ClassTemplateSpecialization> addSpecialization,
+            ITypeMapDatabase typeMaps, bool internalOnly = false)
+        {
+            type = type.Desugar();
+            type = (type.GetFinalPointee() ?? type).Desugar();
+            var listType = type as TemplateSpecializationType;
+            if (listType != null)
+            {
+                ClassTemplateSpecialization specialization = GetParentSpecialization(listType);
+                if (specialization == null)
+                    return true;
+
+                if (IsOptionalSpecializationNeeded(container, typeMaps, internalOnly,
                     type, specialization))
                     return false;
 
@@ -221,9 +283,15 @@ namespace CppSharp.Passes
             {
                 CheckTypeForVectorSpecialization(function.OriginalReturnType.Type,
                     function, Add, Context.TypeMaps);
+                CheckTypeForOptionalSpecialization(function.OriginalReturnType.Type,
+                    function, Add, Context.TypeMaps);
                 foreach (var parameter in function.Parameters)
+                {
                     CheckTypeForVectorSpecialization(parameter.Type, function,
                         Add, Context.TypeMaps);
+                    CheckTypeForOptionalSpecialization(parameter.Type, function,
+                        Add, Context.TypeMaps);
+                }
             }
 
             if (!NeedsSymbol(function))

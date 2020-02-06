@@ -359,11 +359,22 @@ namespace CppSharp.Types.Std
             var assign = basicString.Methods.First(m => m.OriginalName == "assign");
             if (ctx.MarshalKind == MarshalKind.NativeField)
             {
-                ctx.Return.Write($@"{qualifiedBasicString}Extensions.{
-                    Helpers.InternalStruct}.{assign.Name}(new {
-                    typePrinter.IntPtrType}(&{
-                    ctx.ReturnVarName}), {ctx.Parameter.Name})");
-                ctx.ReturnVarName = string.Empty;
+                if (Context.PolarFixesEnabled)
+                {
+                    ctx.Return.Write($@"{qualifiedBasicString}Extensions.{
+                            Helpers.InternalStruct}.{assign.Name}(new {
+                            typePrinter.IntPtrType}(&{
+                            ctx.ReturnVarName}), (string) (object) {ctx.Parameter.Name})");
+                    ctx.ReturnVarName = string.Empty;
+                }
+                else
+                {
+                    ctx.Return.Write($@"{qualifiedBasicString}Extensions.{
+                            Helpers.InternalStruct}.{assign.Name}(new {
+                            typePrinter.IntPtrType}(&{
+                            ctx.ReturnVarName}), {ctx.Parameter.Name})");
+                    ctx.ReturnVarName = string.Empty;
+                }
             }
             else
             {
@@ -398,35 +409,50 @@ namespace CppSharp.Types.Std
         public override void CSharpMarshalToManaged(CSharpMarshalContext ctx)
         {
             var type = Type.Desugar(resolveTemplateSubstitution: false);
-            ClassTemplateSpecialization basicString = GetBasicString(type);
-            var data = basicString.Methods.First(m => m.OriginalName == "data");
-            var typePrinter = new CSharpTypePrinter(ctx.Context);
-            string qualifiedBasicString = GetQualifiedBasicString(basicString);
-            string varBasicString = $"__basicStringRet{ctx.ParameterIndex}";
             bool usePointer = type.IsAddress() || ctx.MarshalKind == MarshalKind.NativeField  ||
                 ctx.MarshalKind == MarshalKind.ReturnVariableArray;
-            ctx.Before.WriteLine($@"var {varBasicString} = {
-                basicString.Visit(typePrinter)}.{Helpers.CreateInstanceIdentifier}({
-                (usePointer ? string.Empty : $"new {typePrinter.IntPtrType}(&")}{
-                 ctx.ReturnVarName}{(usePointer ? string.Empty : ")")});");
+            System.Console.WriteLine(
+                $"UsePointer={usePointer} type {type}, MarshalKind {ctx.MarshalKind} ReturnVarName = {ctx.ReturnVarName}");
             if (Context.PolarFixesEnabled)
             {
-                string @string1 = $"{qualifiedBasicString}Extensions.{data.Name}({varBasicString})";
-                string @string = $"new System.String({@string1})";
-                if (usePointer)
+                if (!usePointer)
                 {
-                    ctx.Return.Write(@string);
+                    string @string2 = $"(((int) {ctx.ReturnVarName}._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_dataplus._M_p, (int) {ctx.ReturnVarName}._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_local_buf, (int) {ctx.ReturnVarName}._M_string_length))";
+
+                    ctx.Return.Write(@string2);
                 }
                 else
                 {
+                    ClassTemplateSpecialization basicString = GetBasicString(type);
+                    var data = basicString.Methods.First(m => m.OriginalName == "data");
+                    var typePrinter = new CSharpTypePrinter(ctx.Context);
+                    string qualifiedBasicString = GetQualifiedBasicString(basicString);
+                    string varBasicString = $"__basicStringRet{ctx.ParameterIndex}";
+                    ctx.Before.WriteLine($@"var {varBasicString} = {
+                            basicString.Visit(typePrinter)}.{Helpers.CreateInstanceIdentifier}({
+                            (usePointer ? string.Empty : $"new {typePrinter.IntPtrType}(&")}{
+                            ctx.ReturnVarName}{(usePointer ? string.Empty : ")")});");
+                    string @string1 = $"{qualifiedBasicString}Extensions.{data.Name}({varBasicString})";
+                    string @string = $"new System.String({@string1})";                
                     string retString = $"{Generators.Generator.GeneratedIdentifier("retString")}{ctx.ParameterIndex}";
                     ctx.Before.WriteLine($"var {retString} = {@string};");
-                    ctx.Before.WriteLine($"{varBasicString}.Dispose();");
+                    // When we create an instance with "CreateInstance" for a string, it merely just assigns the native.
+                    // So a Dispose here will free it on the C++ side prematurely.
+                    //ctx.Before.WriteLine($"{varBasicString}.Dispose();");
                     ctx.Return.Write(retString);
                 }
             }
             else
             {
+                ClassTemplateSpecialization basicString = GetBasicString(type);
+                var data = basicString.Methods.First(m => m.OriginalName == "data");
+                var typePrinter = new CSharpTypePrinter(ctx.Context);
+                string qualifiedBasicString = GetQualifiedBasicString(basicString);
+                string varBasicString = $"__basicStringRet{ctx.ParameterIndex}";
+                ctx.Before.WriteLine($@"var {varBasicString} = {
+                        basicString.Visit(typePrinter)}.{Helpers.CreateInstanceIdentifier}({
+                        (usePointer ? string.Empty : $"new {typePrinter.IntPtrType}(&")}{
+                        ctx.ReturnVarName}{(usePointer ? string.Empty : ")")});");
                 string @string = $"{qualifiedBasicString}Extensions.{data.Name}({varBasicString})";
                 if (usePointer)
                 {
@@ -436,7 +462,9 @@ namespace CppSharp.Types.Std
                 {
                     string retString = $"{Generator.GeneratedIdentifier("retString")}{ctx.ParameterIndex}";
                     ctx.Before.WriteLine($"var {retString} = {@string};");
-                    ctx.Before.WriteLine($"{varBasicString}.Dispose();");
+                    // When we create an instance with "CreateInstance" for a string, it merely just assigns the native.
+                    // So a Dispose here will free it on the C++ side prematurely.
+                    //ctx.Before.WriteLine($"{varBasicString}.Dispose();");
                     ctx.Return.Write(retString);
                 }
             }

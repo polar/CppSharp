@@ -44,7 +44,21 @@ namespace CppSharp
         {
             DriverOptions.SetVectorHolderPath(path);
             ExtModule.Headers.Add(path);
-            ExtModule.Headers.Add("/home/polar/RiderProjects/ALK.Interop/ALK.Interop/CppAPI/Interop/Tuple3Holder.hpp");
+        }
+
+        public void SetVectorHolderName(string name)
+        {
+            DriverOptions.SetVectorHolderName(name);
+        }
+        public void SetOptionalPath(string path)
+        {
+            DriverOptions.SetOptionalPath(path);
+            ExtModule.Headers.Add(path);
+        }
+
+        public void SetOptionalName(string name)
+        {
+            DriverOptions.SetOptionalName(name);
         }
         public void setOutputDirectory(string dir)
         {

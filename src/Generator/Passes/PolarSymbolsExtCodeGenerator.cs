@@ -26,13 +26,15 @@ namespace CppSharp.Passes
             WriteLine("#define _LIBCPP_HIDE_FROM_ABI");
             NewLine();
             WriteLine("#include \"{0}\"", ((PolarDriverOptions)Context.Options).VectorHolderPath);
-            WriteLine("#include \"/home/polar/RiderProjects/ALK.Interop/ALK.Interop/CppAPI/Interop/Tuple3Holder.hpp\"");
+// TODO:: Add argument for Optional!
+            WriteLine("#include \"{0}\"", "/home/polar/src/trimble/core/projects/mono/interop/ALK.Interop/ALK.Interop/CppAPI/Interop/Optional.hpp");
+            ///WriteLine("#include \"/home/polar/RiderProjects/ALK.Interop/ALK.Interop/CppAPI/Interop/Tuple3Holder.hpp\"");
             foreach (var module in Options.Modules)
             {
                 if (module != Options.SystemModule && module.LibraryName != "Ext")
                 {
                     foreach (var header in module.Headers)
-                        WriteLine($"#include <{header}>");
+                        WriteLine($"#include \"{header}\"");
                 }
             }
             NewLine();
@@ -55,16 +57,29 @@ namespace CppSharp.Passes
         
         public override bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecialization specialization)
         {
+                var typePrinter = new CppSharp.Generators.CSharp.CSharpTypePrinter(Context); 
+System.Console.WriteLine($"VisitClassTemplateSpeciationDecl: {specialization.Visit(typePrinter).Type}");
+            if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "XXX")
+            {
+                var itemType = specialization.Arguments[0].Type.Type;
+                string typeName = itemType.Visit(cppTypePrinter);
+                string strName = Regex.Replace(typeName, @"[:<>&*, .]", "_");
+                string vectorHolderName = "Interop::Optional";
+                WriteLine($"struct ___{strName} {{void foo({vectorHolderName}<{typeName}> _);}};");
+                //WriteLine($"template class VectorHolder<{itemType.Visit(cppTypePrinter)}>;");
+            } else
             if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "std::vector")
             {
                 var itemType = specialization.Arguments[0].Type.Type;
                 string typeName = itemType.Visit(cppTypePrinter);
                 string strName = Regex.Replace(typeName, @"[:<>&*, .]", "_");
-                WriteLine($"struct ___{strName} {{void foo(VectorHolder<{typeName}> _);}};");
+                string vectorHolderName = ((PolarDriverOptions)Context.Options).VectorHolderName;
+                WriteLine($"struct ___{strName} {{void foo({vectorHolderName}<{typeName}> _);}};");
                 //WriteLine($"template class VectorHolder<{itemType.Visit(cppTypePrinter)}>;");
             }
             else if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "std::tuple")
             {
+				//TODO:: This is not working well.
                 var itemTypes = specialization.Arguments.ConvertAll(x => x.Type);
                 var count = itemTypes.Count;
                 string typeName = parameterString(itemTypes);
