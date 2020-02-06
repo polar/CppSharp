@@ -11,13 +11,137 @@ using CppSharp.Generators.CSharp;
 
 namespace CppSharp.Types.Ext
 {
-    
-    
     [
-        TypeMap("Optional", GeneratorKind = GeneratorKind.CLI),
+        TypeMap("DayOfWeek", GeneratorKind = GeneratorKind.CSharp)
+    ]
+    public class DayOfWeek : TypeMap
+    {
+        public override bool IsIgnored
+        {
+            get { return false; }
+        }
+        
+        public override bool DoesMarshalling
+        {
+            get { return false; }
+        }
+        public override Type CSharpSignatureType(TypePrinterContext ctx)
+        {
+            return new CustomType("System.DayOfWeek");
+        }
+    }
+    [
+        TypeMap("StringOptional", GeneratorKind = GeneratorKind.CSharp),
+        TypeMap("global::ALK.Interop.StringOptional", GeneratorKind = GeneratorKind.CSharp)
+    ]
+    public class StringOptional : TypeMap
+    {
+        public override bool IsIgnored
+        {
+            get { return false; }
+        }
+
+        public override bool DoesMarshalling
+        {
+            get { return true; }
+        }
+
+        public override Type CSharpSignatureType(TypePrinterContext ctx)
+        {
+            if (ctx.Kind == TypePrinterContextKind.Managed)
+            {
+               return new CustomType("string");
+            }
+
+            Declaration basicString = GetBasicString(ctx.Type);
+            var typePrinter = new CSharpTypePrinter(null);
+            typePrinter.PushContext(TypePrinterContextKind.Native);
+            return new CustomType(basicString.Visit(typePrinter).Type);
+        }
+
+        public override void CSharpMarshalToNative(CSharpMarshalContext ctx)
+        {
+            Type type = ctx.Parameter.Type.Desugar();
+            Declaration basicString = GetBasicString(type);
+            var typePrinter = new CSharpTypePrinter(ctx.Context);
+            //if (!ctx.Parameter.Type.Desugar().IsAddress() &&
+            //    ctx.MarshalKind != MarshalKind.NativeField)
+            //    ctx.Return.Write($"*({typePrinter.PrintNative(basicString)}*) ");
+            if (ctx.MarshalKind == MarshalKind.NativeField)
+            {
+            	var varBasicString = $"_tmp{ctx.ParameterIndex}";
+            	ctx.Before.WriteLine($@"var {varBasicString} =  global::ALK.Interop.StringOptional.__CreateInstance(new global::System.IntPtr(&{ctx.ReturnVarName}));");
+                ctx.Before.WriteLine($@"if (value != null)");
+                ctx.Before.WriteOpenBraceAndIndent();
+                    ctx.Before.WriteLine($@"{varBasicString}._M_payload = {ctx.Parameter.Name};");
+                	ctx.Before.WriteLine($@"{varBasicString}._M_engaged = true;");;
+            	ctx.Before.UnindentAndWriteCloseBrace();
+                ctx.Before.WriteLine("else");
+            	ctx.Before.WriteOpenBraceAndIndent();
+                	 ctx.Before.WriteLine($@"{varBasicString}._M_engaged = false;");;
+            	ctx.Before.UnindentAndWriteCloseBrace();
+            	ctx.ReturnVarName = string.Empty;
+            }
+            else
+            {
+                var varBasicString = $"__basicString{ctx.ParameterIndex}";
+                    ctx.Before.WriteLine($@"var {varBasicString} = {ctx.Parameter.Name} != null ? new {
+                            basicString.Visit(typePrinter)}({ctx.Parameter.Name}) : new {
+                            basicString.Visit(typePrinter)}();");
+                var pointerType = type as PointerType;
+                if (pointerType != null)
+                {
+                    ctx.Return.Write($"{varBasicString}.{Helpers.InstanceIdentifier}");
+                }
+                else
+                {
+                    ctx.Return.Write($"*({typePrinter.PrintNative(basicString)}*){varBasicString}.{Helpers.InstanceIdentifier}");
+                }
+                if (!type.IsPointer() || ctx.Parameter.IsIndirect)
+                    ctx.Cleanup.WriteLine($@"{varBasicString}.Dispose({
+                        (ctx.MarshalKind == MarshalKind.NativeField ? "false" : string.Empty)});");
+            }
+        }
+
+        public override void CSharpMarshalToManaged(CSharpMarshalContext ctx)
+        {
+            Declaration basicString = GetBasicString(Type);
+            var typePrinter = new CSharpTypePrinter(ctx.Context); 
+            string qualifiedBasicString = GetQualifiedBasicString(basicString);
+ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
+            var ptrBasicString = $"_ptr{ctx.ParameterIndex}";
+            var varBasicString = $"_tmp{ctx.ParameterIndex}";
+            var retBasicString = $"_ret{ctx.ParameterIndex}";
+            //ctx.Before.WriteLine($@"var {ptrBasicString} =  {ctx.ReturnVarName};");
+            ctx.Before.WriteLine($@"var {varBasicString} =  global::ALK.Interop.StringOptional.__CreateInstance({ctx.ReturnVarName});");
+
+            //ctx.Before.WriteLine($@"var {varBasicString} =  (({typePrinter.PrintNative(basicString)}*){ctx.ReturnVarName});");
+            ctx.Before.WriteLine("string {0} = null;", retBasicString);
+            ctx.Before.WriteLine($@"if ({varBasicString}._M_engaged)");
+            ctx.Before.WriteOpenBraceAndIndent();
+                ctx.Before.WriteLine($@"{retBasicString} = {varBasicString}._M_payload;");
+            ctx.Before.UnindentAndWriteCloseBrace();
+            ctx.Return.Write(retBasicString);
+        }
+
+        private static string GetQualifiedBasicString(Declaration basicString)
+        {
+            // TODO:: Wonder why this isn't coming out as ALK.Interop
+            return $"global::ALK.Interop.StringOptional";
+        }
+
+        private static Declaration GetBasicString(Type type)
+        {
+            var desugared = type.Desugar();
+            var template = (desugared.GetFinalPointee() ?? desugared).Desugar();
+            return ((TagType) template).Declaration;
+        }
+
+    }
+
+    [
         TypeMap("Optional", GeneratorKind = GeneratorKind.CSharp),
-        TypeMap("global::ALK.Interop.Optional<T>", GeneratorKind = GeneratorKind.CLI),
-        TypeMap("global::ALK.Interop.Optional<T>", GeneratorKind = GeneratorKind.CSharp)
+    TypeMap("Interop::Optional", GeneratorKind = GeneratorKind.CSharp)
     ]
     public class Optional : TypeMap
     {
@@ -25,119 +149,26 @@ namespace CppSharp.Types.Ext
         {
             get { return false; }
         }
-        
-        public override Type CLISignatureType(TypePrinterContext ctx)
-        {
-            return new CustomType(
-                $"System::Nullable<{ctx.GetTemplateParameterList()}>^");
-        }
-        
-        public override void CLIMarshalToNative(MarshalContext ctx)
-        {
-            var templateType = Type as TemplateSpecializationType;
-            var type = templateType.Arguments[0].Type;
-            var isPointerToPrimitive = type.Type.IsPointerToPrimitiveType();
-            var managedType = isPointerToPrimitive
-                ? new CILType(typeof(System.IntPtr))
-                : type.Type;
-
-            var entryString = (ctx.Parameter != null) ? ctx.Parameter.Name
-                : ctx.ArgName;
-
-            var tmpVarName = "_tmp" + entryString;
-
-            var cppTypePrinter = new CppTypePrinter();
-            var nativeType = type.Type.Visit(cppTypePrinter);
-
-            ctx.Before.WriteLine("auto {0} = ALK.Interop.Optional<{1}>();",
-                tmpVarName, nativeType);
-            ctx.Before.WriteOpenBraceAndIndent();
-            {
-                var param = new Parameter
-                {
-                    Name = "_element",
-                    QualifiedType = type
-                };
-
-                var elementCtx = new MarshalContext(ctx.Context, ctx.Indentation)
-                                     {
-                                         Parameter = param,
-                                         ArgName = param.Name,
-                                     };
-
-                var marshal = new CLIMarshalManagedToNativePrinter(elementCtx);
-                type.Type.Visit(marshal);
-
-                if (!string.IsNullOrWhiteSpace(marshal.Context.Before))
-                    ctx.Before.Write(marshal.Context.Before);
-
-                if (isPointerToPrimitive)
-                    ctx.Before.WriteLine("auto _marshalElement = {0}.ToPointer();",
-                        marshal.Context.Return);
-                else
-                    ctx.Before.WriteLine("auto _marshalElement = {0};",
-                    marshal.Context.Return);
-
-                ctx.Before.WriteLine("{0} = _marshalElement;",
-                    tmpVarName);
-            }
-            
-            ctx.Before.UnindentAndWriteCloseBrace();
-
-            ctx.Return.Write(tmpVarName);
-        }
 
         public override bool DoesMarshalling
         {
             get { return true; }
         }
-        
-        public override void CLIMarshalToManaged(MarshalContext ctx)
-        {
-            var templateType = Type as TemplateSpecializationType;
-            var type = templateType.Arguments[0].Type;
-            var isPointerToPrimitive = type.Type.IsPointerToPrimitiveType();
-            var managedType = isPointerToPrimitive
-                ? new CILType(typeof(System.IntPtr))
-                : type.Type;
-            var tmpVarName = "_tmp" + ctx.ArgName;
-            
-            ctx.Before.WriteLine(
-                "auto {0} = gcnew System::Nullable<{1}>();",
-                tmpVarName, managedType);
-            ctx.Before.WriteOpenBraceAndIndent();
-            {
-                var elementCtx = new MarshalContext(ctx.Context, ctx.Indentation)
-                {
-                    ReturnVarName = "_element",
-                    ReturnType = type
-                };
-
-                var marshal = new CLIMarshalNativeToManagedPrinter(elementCtx);
-                type.Type.Visit(marshal);
-
-                if (!string.IsNullOrWhiteSpace(marshal.Context.Before))
-                    ctx.Before.Write(marshal.Context.Before);
-
-                ctx.Before.WriteLine("auto _marshalElement = {0};",
-                    marshal.Context.Return);
-
-                if (isPointerToPrimitive)
-                    ctx.Before.WriteLine("{0} = ({1}(_marshalElement));",
-                        tmpVarName, managedType);
-                else
-                    ctx.Before.WriteLine("{0} = _marshalElement;",
-                        tmpVarName);
-            }
-            ctx.Before.UnindentAndWriteCloseBrace();
-
-            ctx.Return.Write(tmpVarName);
-        }
 
         public override Type CSharpSignatureType(TypePrinterContext ctx)
         {
+            var templateType = Type as TemplateSpecializationType;
+            var insideType = templateType.Arguments[0].Type;
+            
             if (ctx.Kind == TypePrinterContextKind.Managed)
+            {
+                if (!IsPrimitiveType(insideType.Type))
+                {
+                    return new CustomType($"global::ALK.Interop.Optional<{ctx.GetTemplateParameterList()}>");
+                }
                 return new CustomType($"{ctx.GetTemplateParameterList()}?");
+            }
+
             ClassTemplateSpecialization basicString = GetBasicString(ctx.Type);
             var typePrinter = new CSharpTypePrinter(null);
             typePrinter.PushContext(TypePrinterContextKind.Native);
@@ -161,23 +192,37 @@ namespace CppSharp.Types.Ext
             	var varBasicString = $"_tmp{ctx.ParameterIndex}";
 ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             	ctx.Before.WriteLine($@"var {varBasicString} =  {ctx.ReturnVarName};");
-            	ctx.Before.WriteLine($@"if (value.HasValue)");
-            	ctx.Before.WriteOpenBraceAndIndent();
-                    var value = insideType.ToString() == "bool" ? $"(byte) ({ctx.Parameter.Name}.Value ? 1 : 0)" : $"{ctx.Parameter.Name}.Value";
+                if (!IsPrimitiveType(insideType.Type))
+                    ctx.Before.WriteLine($@"if (value != null && value.has_value())");
+                else
+            	    ctx.Before.WriteLine($@"if (value.HasValue)");
+                ctx.Before.WriteOpenBraceAndIndent();
+                    var value = !IsPrimitiveType(insideType.Type) ?
+                        $"{ctx.Parameter.Name}.value()" : 
+                        (insideType.ToString() == "bool" ? $"(byte) ({ctx.Parameter.Name}.Value ? 1 : 0)" 
+                            : $"{ctx.Parameter.Name}.Value");
                     ctx.Before.WriteLine($@"{varBasicString}._M_payload = {value};");
+                    ctx.Before.WriteLine($@"{varBasicString}._M_engaged = (byte) 1;");
             	ctx.Before.UnindentAndWriteCloseBrace();
                 ctx.Before.WriteLine("else");
             	ctx.Before.WriteOpenBraceAndIndent();
-                	 ctx.Before.WriteLine($@"{varBasicString}._M_engaged = (byte) 0;");;
+                	 ctx.Before.WriteLine($@"{varBasicString}._M_engaged = (byte) 0;");
             	ctx.Before.UnindentAndWriteCloseBrace();
             	ctx.ReturnVarName = string.Empty;
             }
             else
             {
                 var varBasicString = $"__basicString{ctx.ParameterIndex}";
-                ctx.Before.WriteLine($@"var {varBasicString} = {ctx.Parameter.Name}.HasValue ? new {
-                    basicString.Visit(typePrinter)}({ctx.Parameter.Name}.Value) : new {
-                    basicString.Visit(typePrinter)}();");
+                if (!IsPrimitiveType(insideType.Type))
+                    ctx.Before.WriteLine($@"var {varBasicString} = {ctx.Parameter.Name}.has_value() ? new {
+                            basicString.Visit(typePrinter)}({ctx.Parameter.Name}.value()) : new {
+                            basicString.Visit(typePrinter)}();");
+                else
+                {
+                    ctx.Before.WriteLine($@"var {varBasicString} = {ctx.Parameter.Name}.HasValue ? new {
+                            basicString.Visit(typePrinter)}({ctx.Parameter.Name}.Value) : new {
+                            basicString.Visit(typePrinter)}();");
+                }
                 var pointerType = type as PointerType;
                 if (pointerType != null)
                 {
@@ -207,10 +252,17 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             var retBasicString = $"_ret{ctx.ParameterIndex}";
             ctx.Before.WriteLine($@"var {ptrBasicString} =  {ctx.ReturnVarName};");
             ctx.Before.WriteLine($@"var {varBasicString} =  (({typePrinter.PrintNative(basicString)}*){ctx.ReturnVarName});");
+            if (!IsPrimitiveType(insideType.Type))
+                ctx.Before.WriteLine("var {0} = new global::ALK.Interop.Optional<{0}>();", insideType, retBasicString);
+            else
             	ctx.Before.WriteLine("var {1} = new System.Nullable<{0}>();", insideType, retBasicString);
             ctx.Before.WriteLine($@"if ({varBasicString}->_M_engaged != 0)");
             ctx.Before.WriteOpenBraceAndIndent();
-            	ctx.Before.WriteLine("{3} = new System.Nullable<{0}>({1}->_M_payload{2});", insideType, varBasicString,
+            if (!IsPrimitiveType(insideType.Type))
+                ctx.Before.WriteLine("{3} = new global::ALK.Interop.Optional<{0}>({1}->_M_payload{2});", insideType, varBasicString,
+                    insideType.ToString() == "bool" ? " !=0" : "", retBasicString);
+            else
+                ctx.Before.WriteLine("{3} = new System.Nullable<{0}>({1}->_M_payload{2});", insideType, varBasicString,
                     insideType.ToString() == "bool" ? " !=0" : "", retBasicString);
             ctx.Before.UnindentAndWriteCloseBrace();
             ctx.Return.Write(retBasicString);
@@ -240,6 +292,31 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             if (templateSpecializationType != null)
                 return templateSpecializationType.GetClassTemplateSpecialization();
             return (ClassTemplateSpecialization) ((TagType) template).Declaration;
+        }
+        
+        public bool IsPrimitiveType(Type type)
+        {
+            if (type == null)
+                return false;
+            if (type is BuiltinType)
+            {
+                var primitiveType = (type as BuiltinType).Type;
+                return primitiveType != PrimitiveType.String;
+            }
+            if (type is TagType)
+            {
+                Enumeration decl = (type as TagType).Declaration as Enumeration;
+                if (decl != null)
+                    return IsPrimitiveType(decl.Type);
+            }
+
+            if (type is TypedefType)
+            {
+                TypedefNameDecl decl = (type as TypedefType).Declaration;
+                if (decl != null)
+                    return IsPrimitiveType(decl.Type);
+            }
+            return false;
         }
     }
 
@@ -352,6 +429,8 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
         {
             var templateType = Type as TemplateSpecializationType;
             var insideType = templateType.Arguments[0].Type;
+            
+            var vectorHolderTypeName = ((PolarDriverOptions)Context.Options).VectorHolderName;
 
             Type type = ctx.Parameter.Type.Desugar();
             ClassTemplateSpecialization basicString = GetBasicString(type);
@@ -403,7 +482,12 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
                         }
                         else
                         {
-                            ctx.Before.WriteLine($@"{vectorHolderName}.addByRef({vectorItName}.__Instance);");
+                            ctx.Before.WriteLine($@"if ({vectorItName} != null)");
+                            ctx.Before.WriteLine($@"    {vectorHolderName}.addByRef({vectorItName}.__Instance);");
+                            ctx.Before.WriteLine($@"else");
+                            var message =
+                                $@"Warning: Skipping add for {ctx.Parameter.Name}. Think about using std::vector<Optional<{insideTypeName}>>.";
+                            ctx.Before.WriteLine($"    System.Console.WriteLine(\"{message}\");");
                         }
                     }
                     else
@@ -447,6 +531,8 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             ClassTemplateSpecialization basicString = GetBasicString(templateType);
             var typePrinter = new CSharpTypePrinter(ctx.Context);
 
+            var vectorHolderTypeName = ((PolarDriverOptions)Context.Options).VectorHolderName;
+            
             var typeCast = $"({typePrinter.PrintNative(basicString)})";
             // So we have the case that when the arg name is not generated, i.e. "_ret", its ReturnVarName is
             // a System.IntPtr of an already typecasted value, i.e. a property, etc. This would be for the
@@ -625,7 +711,8 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
     }
     
 
-    [TypeMap("std::tuple", GeneratorKind = GeneratorKind.CSharp)]
+    // We are not going to use this.
+    //[TypeMap("std::tuple", GeneratorKind = GeneratorKind.CSharp)]
     public class Map : TypeMap
     {
         public override bool IsIgnored { get { return false; } }
