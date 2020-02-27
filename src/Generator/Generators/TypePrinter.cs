@@ -1,25 +1,30 @@
 ﻿using CppSharp.AST;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace CppSharp.Generators
 {
     public class TypePrinterResult
     {
-        public string Type;
-        public string NameSuffix;
+        public string Type { get; set; }
+        public StringBuilder NameSuffix { get; set; } = new StringBuilder();
 
-        public static implicit operator TypePrinterResult(string type)
+        public TypePrinterResult(string type = "", string nameSuffix = "")
         {
-            return new TypePrinterResult { Type = type };
+            Type = type;
+            NameSuffix.Append(nameSuffix);
         }
 
-        public static implicit operator string(TypePrinterResult result)
-        {
-            return result.Type;
-        }
+        public static implicit operator TypePrinterResult(string type) =>
+            new TypePrinterResult { Type = type };
 
-        public override string ToString() => Type;
+        public static implicit operator string(TypePrinterResult result) =>
+           result.ToString();
+
+        public override string ToString() =>
+            NameSuffix.Length > 0 ? Type.Contains("{0}") ?
+            string.Format(Type, NameSuffix) : Type + NameSuffix : Type;
     }
 
     public class TypePrinter : ITypePrinter<TypePrinterResult>,
@@ -350,6 +355,11 @@ namespace CppSharp.Generators
             throw new NotImplementedException();
         }
 
+        public TypePrinterResult VisitUnresolvedUsingType(UnresolvedUsingType unresolvedUsingType, TypeQualifiers quals)
+        {
+            throw new NotImplementedException();
+        }
+
         public virtual TypePrinterResult VisitUnsupportedType(UnsupportedType type,
             TypeQualifiers quals)
         {
@@ -368,6 +378,11 @@ namespace CppSharp.Generators
 
         public virtual TypePrinterResult VisitVarTemplateSpecializationDecl(
             VarTemplateSpecialization template)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TypePrinterResult VisitUnresolvedUsingDecl(UnresolvedUsingTypename unresolvedUsingTypename)
         {
             throw new NotImplementedException();
         }

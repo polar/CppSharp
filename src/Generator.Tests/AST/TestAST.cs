@@ -219,6 +219,11 @@ namespace CppSharp.Generator.Tests.AST
             {
                 throw new NotImplementedException();
             }
+
+            public bool VisitUnresolvedUsingDecl(UnresolvedUsingTypename unresolvedUsingTypename)
+            {
+                throw new NotImplementedException();
+            }
         }
         #endregion
 
@@ -472,7 +477,7 @@ namespace CppSharp.Generator.Tests.AST
             var builtin = new BuiltinType(PrimitiveType.Char);
             var pointee = new QualifiedType(builtin, new TypeQualifiers { IsConst = true });
             var pointer = new QualifiedType(new PointerType(pointee), new TypeQualifiers { IsConst = true });
-            var type = pointer.Visit(cppTypePrinter).Type;
+            string type = pointer.Visit(cppTypePrinter);
             Assert.That(type, Is.EqualTo("const char* const"));
         }
 
@@ -495,11 +500,20 @@ namespace CppSharp.Generator.Tests.AST
         [Test]
         public void TestFunctionSpecifications()
         {
-            var constExprNoExcept = AstContext.FindFunction("constExprNoExcept").First();
-            Assert.IsTrue(constExprNoExcept.IsConstExpr);
-            var functionType = (FunctionType) constExprNoExcept.FunctionType.Type;
-            Assert.That(functionType.ExceptionSpecType,
+            var constExpr = AstContext.FindFunction("constExpr").First();
+            Assert.IsTrue(constExpr.IsConstExpr);
+
+            var noExcept = AstContext.FindFunction("noExcept").First();
+            Assert.That(((FunctionType) noExcept.FunctionType.Type).ExceptionSpecType,
                 Is.EqualTo(ExceptionSpecType.BasicNoexcept));
+
+            var noExceptTrue = AstContext.FindFunction("noExceptTrue").First();
+            Assert.That(((FunctionType) noExceptTrue.FunctionType.Type).ExceptionSpecType,
+                Is.EqualTo(ExceptionSpecType.NoexceptTrue));
+
+            var noExceptFalse = AstContext.FindFunction("noExceptFalse").First();
+            Assert.That(((FunctionType) noExceptFalse.FunctionType.Type).ExceptionSpecType,
+                Is.EqualTo(ExceptionSpecType.NoexceptFalse));
 
             var regular = AstContext.FindFunction("testSignature").First();
             Assert.IsFalse(regular.IsConstExpr);

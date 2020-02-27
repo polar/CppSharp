@@ -641,12 +641,13 @@ namespace CppSharp.Generators.CSharp
             foreach (var prop in @class.Properties.Where(p => p.Field == null))
             {
                 if ((!prop.IsOverride || prop.GetMethod.Namespace == @class) &&
-                    !functions.Contains(prop.GetMethod))
+                    !functions.Contains(prop.GetMethod) && !prop.GetMethod.Ignore)
                     tryAddOverload(prop.GetMethod);
 
-                if (prop.SetMethod != null
-                    && (!prop.IsOverride || prop.SetMethod.Namespace == @class)
-                    && !functions.Contains(prop.SetMethod))
+                if (prop.SetMethod != null &&
+                    (!prop.IsOverride || prop.SetMethod.Namespace == @class) &&
+                    !functions.Contains(prop.SetMethod) &&
+                    !prop.GetMethod.Ignore)
                     tryAddOverload(prop.SetMethod);
             }
         }
@@ -763,7 +764,7 @@ namespace CppSharp.Generators.CSharp
 
             if (!Options.GenerateSequentialLayout || @class.IsUnion)
                 WriteLine($"[FieldOffset({field.Offset})]");
-            Write($"internal {retType}{retType.NameSuffix}");
+            Write($"internal {retType}");
             if (field.Expression != null)
             {
                 var fieldValuePrinted = field.Expression.CSharpValue(ExpressionPrinter);

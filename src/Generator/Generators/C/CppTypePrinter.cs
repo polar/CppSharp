@@ -69,32 +69,13 @@ namespace CppSharp.Generators.C
 
         public override TypePrinterResult VisitPointerType(PointerType pointer, TypeQualifiers quals)
         {
-            var pointee = pointer.Pointee;
-
-            var function = pointee as FunctionType;
-            if (function != null)
-            {
-                var arguments = function.Parameters;
-                var returnType = function.ReturnType;
-                var args = string.Empty;
-
-                if (arguments.Count > 0)
-                    args = VisitParameters(function.Parameters, hasNames: false);
-
-                var callingConvention = string.Empty;
-                if (function.CallingConvention != CallingConvention.Default &&
-                    function.CallingConvention != CallingConvention.C)
-                {
-                    string conventionString = function.CallingConvention.ToString();
-                    callingConvention = $"__{conventionString.ToLowerInvariant()} ";
-                }
-                return $"{returnType.Visit(this)} ({callingConvention}*)({args})";
-            }
-
             var qual = GetStringQuals(quals, false);
-            var pointeeType = pointee.Visit(this, pointer.QualifiedPointee.Qualifiers);
+            var pointeeType = pointer.Pointee.Visit(this, pointer.QualifiedPointee.Qualifiers);
             var mod = PrintTypeModifiers ? ConvertModifierToString(pointer.Modifier) : string.Empty;
-            return $"{pointeeType}{mod}{(string.IsNullOrEmpty(qual) ? string.Empty : " ")}{qual}";
+            pointeeType.NameSuffix.Append(mod);
+            if (!string.IsNullOrEmpty(qual))
+                pointeeType.NameSuffix.Append(' ').Append(qual);
+            return pointeeType;
         }
 
         public override TypePrinterResult VisitMemberPointerType(MemberPointerType member, TypeQualifiers quals)
@@ -181,7 +162,10 @@ namespace CppSharp.Generators.C
             FunctionType func;
             var qual = GetStringQuals(quals);
             if (ResolveTypedefs && !typedef.Declaration.Type.IsPointerTo(out func))
-                return $"{qual}{typedef.Declaration.QualifiedType.Visit(this)}";
+            {
+                TypePrinterResult type = typedef.Declaration.QualifiedType.Visit(this);
+                return new TypePrinterResult { Type = $"{qual}{type.Type}", NameSuffix = type.NameSuffix };
+            }
             return $"{qual}{typedef.Declaration.Visit(this)}";
         }
 
@@ -310,7 +294,14 @@ namespace CppSharp.Generators.C
             if (arguments.Count > 0)
                 args = VisitParameters(function.Parameters, hasNames: false);
 
-            return string.Format("{0} ({1})", returnType.Visit(this), args);
+            var callingConvention = string.Empty;
+            if (function.CallingConvention != CallingConvention.Default &&
+                function.CallingConvention != CallingConvention.C)
+            {
+                string conventionString = function.CallingConvention.ToString();
+                callingConvention = $"__{conventionString.ToLowerInvariant()} ";
+            }
+            return $"{returnType.Visit(this)} ({callingConvention}{{0}})({args})";
         }
 
         public override TypePrinterResult VisitParameters(IEnumerable<Parameter> @params,
@@ -329,9 +320,9 @@ namespace CppSharp.Generators.C
 
         public override TypePrinterResult VisitParameter(Parameter arg, bool hasName = true)
         {
-            var type = arg.Type.Visit(this, arg.QualifiedType.Qualifiers).Type;
-            var name = arg.Name;
-            var printName = hasName && !string.IsNullOrEmpty(name);
+            string type = arg.Type.Visit(this, arg.QualifiedType.Qualifiers);
+            string name = arg.Name;
+            bool printName = hasName && !string.IsNullOrEmpty(name);
 
             if (PrintFlavorKind == CppTypePrintFlavorKind.ObjC)
                 return printName ? string.Format(":({0}){1}", type, name)
@@ -423,9 +414,24 @@ namespace CppSharp.Generators.C
                 method.OperatorKind == CXXOperatorKind.ExplicitConversion ?
                 $"operator {method.OriginalReturnType.Visit(this)}" :
                 method.OriginalName;
-            var exceptionType =
-                functionType.ExceptionSpecType == ExceptionSpecType.BasicNoexcept ?
-                " noexcept" : string.Empty;
+
+            string exceptionType;
+            switch (functionType.ExceptionSpecType)
+            {
+                case ExceptionSpecType.BasicNoexcept:
+                    exceptionType = " noexcept";
+                    break;
+                case ExceptionSpecType.NoexceptFalse:
+                    exceptionType = " noexcept(false)";
+                    break;
+                case ExceptionSpecType.NoexceptTrue:
+                    exceptionType = " noexcept(true)";
+                    break;
+                // TODO: research and handle the remaining cases
+                default:
+                    exceptionType = string.Empty;
+                    break;
+            }
             return $"{returnType}{@class}::{name}({@params}){@const}{exceptionType}";
         }
 

@@ -23,16 +23,9 @@ function get_llvm_rev()
 	return cat(basedir .. "/LLVM-commit")
 end
 
-function get_clang_rev()
-	return cat(basedir .. "/Clang-commit")
-end
-
 function clone_llvm()
   local llvm_release = get_llvm_rev()
   print("LLVM release: " .. llvm_release)
-
-  local clang_release = get_clang_rev()
-  print("Clang release: " .. clang_release)
 
   if os.ishost("windows") then
     extract = extract_7z_tar_gz
@@ -44,7 +37,7 @@ function clone_llvm()
   if os.isfile(archive) then
     print('Archive '..archive..' already exists.')
   else
-    download('https://github.com/llvm-mirror/llvm/archive/'..llvm_release..'.tar.gz', archive)
+    download('https://github.com/llvm/llvm-project/archive/'..llvm_release..'.tar.gz', archive)
   end
 
   if os.isdir(llvm) then
@@ -56,20 +49,13 @@ function clone_llvm()
   end
 
   extract(archive, '.')
-  os.rename('llvm-'..llvm_release, llvm)
-
-  archive = 'clang-'..clang_release..'.tar.gz'
-  if os.isfile(archive) then
-    print('Archive '..archive..' already exists.')
-  else
-    download('https://github.com/llvm-mirror/clang/archive/'..clang_release..'.tar.gz', archive)
-  end
-  extract(archive, '.')
-  os.rename('clang-'..clang_release, llvm..'/tools/clang')
+  os.rename('llvm-project-'..llvm_release, llvm)
 end
+
 function get_vs_version()
   local function map_msvc_to_vs_version(major, minor)
-    if major == "19" and minor >= "10" then return "vs2017"
+    if major == "19" and minor >= "20" then return "vs2019"
+    elseif major == "19" and minor >= "10" then return "vs2017"
     elseif major == "19" then return "vs2015"
     elseif major == "18" then return "vs2013"
     elseif major == "17" then return "vs2012"
@@ -207,7 +193,7 @@ function download_llvm()
 end
 
 function cmake(gen, conf, builddir, options)
-	local cwd = os.getcwd()
+    local cwd = os.getcwd()
 	os.chdir(builddir)
 	local cmake = os.ishost("macosx") and "/Applications/CMake.app/Contents/bin/cmake"
 		or "cmake"
@@ -219,7 +205,7 @@ function cmake(gen, conf, builddir, options)
 	if UseClang() then
 		local cmake = path.join(basedir, "scripts", "ClangToolset.cmake")
 		options = options .. " -DLLVM_USE_LINKER=/usr/bin/ld.lld"
-	end
+    end
 
 	if os.ishost("windows") then
 		options = options .. "-Thost=x64"
@@ -228,7 +214,7 @@ function cmake(gen, conf, builddir, options)
 	local cmd = cmake .. " -G " .. '"' .. gen .. '"'
 		.. ' -DLLVM_BUILD_TOOLS=false'
 		.. ' -DLLVM_ENABLE_DUMP=true'
-		.. ' -DLLVM_ENABLE_DUMP=true'
+		.. ' -DLLVM_ENABLE_PROJECTS="clang;lld"'
 		.. ' -DLLVM_INCLUDE_TESTS=false'
  		.. ' -DLLVM_ENABLE_LIBEDIT=false'
  		.. ' -DLLVM_ENABLE_LIBXML2=false'
@@ -325,7 +311,8 @@ function cmake(gen, conf, builddir, options)
  		.. ' -DCLANG_TOOL_CLANG_FUNC_MAPPING_BUILD=false'
  		.. ' -DCLANG_TOOL_CLANG_FUZZER_BUILD=false'
  		.. ' -DCLANG_TOOL_CLANG_IMPORT_TEST_BUILD=false'
- 		.. ' -DCLANG_TOOL_CLANG_OFFLOAD_BUNDLER_BUILD=false'
+		.. ' -DCLANG_TOOL_CLANG_OFFLOAD_BUNDLER_BUILD=false'
+		.. ' -DCLANG_TOOL_CLANG_OFFLOAD_WRAPPER_BUILD=false'
  		.. ' -DCLANG_TOOL_CLANG_REFACTOR_BUILD=false'
  		.. ' -DCLANG_TOOL_CLANG_RENAME_BUILD=false'
  		.. ' -DCLANG_TOOL_DIAGTOOL_BUILD=false'
@@ -333,8 +320,9 @@ function cmake(gen, conf, builddir, options)
 		.. ' -DCLANG_TOOL_LIBCLANG_BUILD=false'
  		.. ' -DCLANG_TOOL_SCAN_BUILD_BUILD=false'
 		.. ' -DCLANG_TOOL_SCAN_VIEW_BUILD=false'
-		.. ' -DCMAKE_BUILD_TYPE=' .. conf .. ' ..'
- 		.. ' -DCMAKE_OSX_DEPLOYMENT_TARGET=10.11'
+		.. ' -DCMAKE_BUILD_TYPE=' .. conf 
+		.. ' ../llvm'
+ 		.. ' -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13'
  		.. ' ' .. options
  	execute_or_die(cmd)
  	os.chdir(cwd)
@@ -346,10 +334,12 @@ end
 
 function get_cmake_generator()
 	local vsver = get_vs_version()
-	if vsver == "vs2017" then
-		return "Visual Studio 15 2017" .. (target_architecture() == "x64" and " Win64" or "")
+	if vsver == "vs2019" then
+		return "Visual Studio 16 2019", (target_architecture() == "x86") and "-A Win32" or nil
+	elseif vsver == "vs2017" then
+		return "Visual Studio 15 2017" .. (target_architecture() == "x64" and " Win64" or ""), nil
 	elseif vsver == "vs2015" then
-		return "Visual Studio 14 2015" .. (target_architecture() == "x64" and " Win64" or "")
+		return "Visual Studio 14 2015" .. (target_architecture() == "x64" and " Win64" or ""), nil
 	else
 		error("Cannot map to CMake configuration due to unknown MSVC version")
 	end
@@ -366,7 +356,8 @@ function build_llvm(llvm_build)
 	local conf = get_llvm_configuration_name()
 	local use_msbuild = true
 	if os.ishost("windows") and use_msbuild then
-		cmake(get_cmake_generator(), conf, llvm_build)
+		local cmake_generator, options = get_cmake_generator()
+		cmake(cmake_generator, conf, llvm_build, options)
 		local llvm_sln = path.join(llvm_build, "LLVM.sln")
 		msbuild('"' .. llvm_sln .. '"', conf)
 	else
@@ -383,8 +374,8 @@ function build_llvm(llvm_build)
 	end
 end
 
-function package_llvm(conf, llvm, llvm_build)
-	local rev = git.rev_parse('"' .. llvm .. '"', "HEAD")
+function package_llvm(conf, llvm_base, llvm_build)
+	local rev = git.rev_parse('"' .. llvm_base .. '"', "HEAD")
 	if string.is_empty(rev) then
 		rev = get_llvm_rev()
 	end
@@ -394,7 +385,7 @@ function package_llvm(conf, llvm, llvm_build)
 	if os.isdir(out) then os.rmdir(out)	end
 	os.mkdir(out)
 
-	os.copydir(llvm .. "/include", out .. "/include")
+	os.copydir(llvm_base .. "/llvm/include", out .. "/include")
 	os.copydir(llvm_build .. "/include", out .. "/build/include")
 
 	local llvm_msbuild_libdir = "/" .. conf .. "/lib"
@@ -408,24 +399,22 @@ function package_llvm(conf, llvm, llvm_build)
 		os.copydir(llvm_build_libdir, out .. "/build/lib", "*.a")
 	end
 
-	os.copydir(llvm .. "/tools/clang/include", out .. "/tools/clang/include")
+	os.copydir(llvm_base .. "/clang/include", out .. "/tools/clang/include")
 	os.copydir(llvm_build .. "/tools/clang/include", out .. "/build/tools/clang/include")
 
 	os.copydir(llvm_build_libdir .. "/clang", out .. "/lib/clang")
 
-	os.copydir(llvm .. "/tools/clang/lib/CodeGen", out .. "/tools/clang/lib/CodeGen", "*.h")
-	os.copydir(llvm .. "/tools/clang/lib/Driver", out .. "/tools/clang/lib/Driver", "*.h")
-	os.copydir(llvm .. "/tools/clang/lib/Driver/ToolChains", out .. "/tools/clang/lib/Driver/ToolChains", "*.h")
+	os.copydir(llvm_base .. "/clang/lib/CodeGen", out .. "/tools/clang/lib/CodeGen", "*.h")
+	os.copydir(llvm_base .. "/clang/lib/Driver", out .. "/tools/clang/lib/Driver", "*.h")
+	os.copydir(llvm_base .. "/clang/lib/Driver/ToolChains", out .. "/tools/clang/lib/Driver/ToolChains", "*.h")
 
 	local out_lib_dir = out .. "/build/lib"
 	if os.ishost("windows") then
-		os.rmfiles(out_lib_dir, "LLVM*ObjCARCOpts*.lib")
 		os.rmfiles(out_lib_dir, "clang*ARC*.lib")
 		os.rmfiles(out_lib_dir, "clang*Matchers*.lib")
 		os.rmfiles(out_lib_dir, "clang*Rewrite*.lib")
 		os.rmfiles(out_lib_dir, "clang*StaticAnalyzer*.lib")
 	else
-		os.rmfiles(out_lib_dir, "libllvm*ObjCARCOpts*.a")
 		os.rmfiles(out_lib_dir, "libclang*ARC*.a")
 		os.rmfiles(out_lib_dir, "libclang*Matchers*.a")
 		os.rmfiles(out_lib_dir, "libclang*Rewrite*.a")

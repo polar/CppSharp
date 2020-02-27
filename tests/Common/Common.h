@@ -6,6 +6,7 @@
 #endif
 #include <string>
 #include <vector>
+#include <memory>
 
 class DLL_API TestPacking
 {
@@ -78,6 +79,7 @@ public:
     class NestedAbstract
     {
     public:
+        virtual ~NestedAbstract();
         virtual int* abstractFunctionInNestedClass() = 0;
     };
 
@@ -252,6 +254,7 @@ public:
 class DLL_API AbstractFoo
 {
 public:
+    virtual ~AbstractFoo();
     virtual int pureFunction(int i = 0) = 0;
     virtual int pureFunction1() = 0;
     virtual int pureFunction2(bool* ok = 0) = 0;
@@ -290,6 +293,7 @@ typedef DerivedException Ex2;
 
 struct DLL_API Exception : public Foo
 {
+    virtual ~Exception();
     virtual Ex1* clone() = 0;
 };
 
@@ -539,11 +543,12 @@ class DLL_API SomeClassExtendingTheStruct : public SomeStruct
 
 namespace SomeNamespace
 {
-        class DLL_API AbstractClass
-        {
-        public:
-                virtual void AbstractMethod() = 0;
-        };
+    class DLL_API AbstractClass
+    {
+    public:
+        ~AbstractClass();
+        virtual void AbstractMethod() = 0;
+    };
 }
 
 // Test operator overloads
@@ -552,11 +557,11 @@ class DLL_API ClassWithOverloadedOperators
 public:
     ClassWithOverloadedOperators();
 
-        operator char();
-        operator int();
-        operator short();
+    operator char();
+    operator int();
+    operator short();
 
-        virtual bool operator<(const ClassWithOverloadedOperators &other) const;
+    virtual bool operator<(const ClassWithOverloadedOperators &other) const;
 };
 
 ClassWithOverloadedOperators::ClassWithOverloadedOperators() {}
@@ -1021,6 +1026,7 @@ public:
 class DLL_API DerivedClassAbstractVirtual : public DerivedClassVirtual
 {
 public:
+    ~DerivedClassAbstractVirtual();
     virtual int retInt(const Foo& foo) = 0;
 };
 
@@ -1261,6 +1267,7 @@ private:
 class DLL_API HasAbstractOperator
 {
 public:
+    ~HasAbstractOperator();
     virtual bool operator==(const HasAbstractOperator& other) = 0;
 };
 
@@ -1522,3 +1529,48 @@ struct DLL_API StructWithCopyCtor
 };
 
 uint16_t DLL_API TestStructWithCopyCtorByValue(StructWithCopyCtor s);
+
+// Issue: https://github.com/mono/CppSharp/issues/1266
+struct BaseCovariant;
+typedef std::unique_ptr<BaseCovariant> PtrCovariant;
+
+struct DLL_API BaseCovariant {
+    virtual ~BaseCovariant();
+    virtual PtrCovariant clone() const = 0;
+};
+
+struct DLL_API DerivedCovariant: public BaseCovariant {
+    virtual ~DerivedCovariant();
+  std::unique_ptr<BaseCovariant> clone() const override {
+    return PtrCovariant(new DerivedCovariant());
+  }
+};
+
+// Issue: https://github.com/mono/CppSharp/issues/1268
+template <typename T>
+class AbstractClassTemplate {
+  public:
+    virtual void func() = 0;
+};
+
+class DerivedClass: public AbstractClassTemplate<int> {
+  public:
+    void func() override {}
+};
+
+// Issue: https://github.com/mono/CppSharp/issues/1235
+#include <functional>
+
+template <typename X, typename Y>
+class TemplateClassBase {
+  public:
+    using XType = X;
+};
+
+template <typename A, typename B = A>
+class TemplateClass : TemplateClassBase<A,B> {
+  public:
+    using typename TemplateClassBase<A,B>::XType;
+    using Func = std::function<B(XType)>;
+    explicit TemplateClass(Func function) {}
+};

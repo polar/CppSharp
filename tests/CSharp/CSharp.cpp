@@ -1,6 +1,4 @@
-﻿#pragma once
-
-#include "CSharp.h"
+﻿#include "CSharp.h"
 
 Foo::Foo(const QString& name)
 {
@@ -323,6 +321,10 @@ Qux Baz::returnQux()
 }
 
 void Baz::setMethod(ProtectedNestedEnum value)
+{
+}
+
+AbstractProprietor::~AbstractProprietor()
 {
 }
 
@@ -802,6 +804,10 @@ int MethodsWithDefaultValues::getA()
     return m_foo.A;
 }
 
+HasPureVirtualWithDefaultArg::~HasPureVirtualWithDefaultArg()
+{
+}
+
 HasOverridesWithChangedAccessBase::HasOverridesWithChangedAccessBase()
 {
 }
@@ -847,6 +853,10 @@ void HasOverridesWithIncreasedAccess::privateOverride(int i)
 }
 
 void HasOverridesWithIncreasedAccess::differentIncreasedAccessOverride()
+{
+}
+
+AbstractWithProperty::~AbstractWithProperty()
 {
 }
 
@@ -1150,6 +1160,10 @@ OverridePropertyFromIndirectPrimaryBaseBase::OverridePropertyFromIndirectPrimary
 {
 }
 
+OverridePropertyFromIndirectPrimaryBaseBase::~OverridePropertyFromIndirectPrimaryBaseBase()
+{
+}
+
 OverridePropertyFromDirectPrimaryBase::OverridePropertyFromDirectPrimaryBase()
 {
 }
@@ -1168,6 +1182,10 @@ int OverridePropertyFromIndirectPrimaryBase::property()
 }
 
 AbstractOverrideFromSecondaryBase::AbstractOverrideFromSecondaryBase()
+{
+}
+
+AbstractOverrideFromSecondaryBase::~AbstractOverrideFromSecondaryBase()
 {
 }
 
@@ -1240,6 +1258,10 @@ char* HasSamePropertyInDerivedAbstractType::property()
 }
 
 InheritsFromHasSamePropertyInDerivedAbstractType::InheritsFromHasSamePropertyInDerivedAbstractType()
+{
+}
+
+InheritsFromHasSamePropertyInDerivedAbstractType::~InheritsFromHasSamePropertyInDerivedAbstractType()
 {
 }
 

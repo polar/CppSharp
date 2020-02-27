@@ -40,14 +40,18 @@ workspace "CppSharp"
     include (srcdir .. "/Generator.Tests")
     include (srcdir .. "/Runtime")
 
-  -- dofile "Tests.lua"
+if not _OPTIONS["disable-tests"] then
+  dofile "Tests.lua"
 
   group "Tests"
-      --IncludeTests()
+      IncludeTests()
+end
 
+if not _OPTIONS["disable-tests"] then
   if string.starts(action, "vs") then
 
   group "Examples"
     IncludeExamples()
-  
+
   end
+end
