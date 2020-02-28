@@ -27,7 +27,7 @@ namespace CppSharp.Passes
             NewLine();
             WriteLine("#include \"{0}\"", ((PolarDriverOptions)Context.Options).VectorHolderPath);
 // TODO:: Add argument for Optional!
-            WriteLine("#include \"{0}\"", "/home/polar/src/trimble/core/projects/mono/interop/ALK.Interop/ALK.Interop/CppAPI/Interop/Optional.hpp");
+            WriteLine("#include \"{0}\"", ((PolarDriverOptions)Context.Options).OptionalPath);
             ///WriteLine("#include \"/home/polar/RiderProjects/ALK.Interop/ALK.Interop/CppAPI/Interop/Tuple3Holder.hpp\"");
             foreach (var module in Options.Modules)
             {
