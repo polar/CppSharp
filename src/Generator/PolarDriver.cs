@@ -112,17 +112,40 @@ namespace CppSharp
             ParserOptions.AddIncludeDirs(s);
         }
 
+        private string platform = "linux";
+
+        public void SetPlatform(string x)
+        {
+            platform = x;
+        }
+        
+        string architecture = "x64";
+
+        public void SetArchitecture(string x)
+        {
+            architecture = x;
+        }
+
         public void setupParserOptions()
         {
             ParserOptions.LanguageVersion = LanguageVersion.CPP17;
             ParserOptions.EnableRTTI = true;
-            ParserOptions.TargetTriple = "x86_64-linux-gnu-cxx11abi";
-            ParserOptions.MicrosoftMode = false;
+            if (platform == "linux")
+            {
+                ParserOptions.TargetTriple = "x86_64-linux-gnu-cxx11abi";
+                ParserOptions.Setup();
+                ParserOptions.SetupLinux();
+                ParserOptions.AddDefines("_GLIBCXX_USE_CXX11_ABI=1");
+                ParserOptions.AddArguments("-fcxx-exceptions");
+            }
+            else
+            {
+                ParserOptions.TargetTriple = architecture + "windows";
+                ParserOptions.Setup();
+                ParserOptions.SetupMSVC();
+            }
+
             ParserOptions.Verbose = false;
-            ParserOptions.Setup();
-            ParserOptions.SetupLinux();
-            ParserOptions.AddDefines("_GLIBCXX_USE_CXX11_ABI=1");
-            ParserOptions.AddArguments("-fcxx-exceptions");
         }
 
         public void FinalizeSetup()
