@@ -20,7 +20,7 @@ function SearchLLVM()
   elseif os.isdir(LLVMRootDir) then
     print("Using LLVM build: " .. LLVMRootDir)
   else
-    error("Error finding an LLVM build")
+    error("Error finding an LLVM build: " .. LLVMRootDir)
   end
 end
 
