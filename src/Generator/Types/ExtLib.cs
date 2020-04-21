@@ -430,7 +430,7 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             var templateType = Type as TemplateSpecializationType;
             var insideType = templateType.Arguments[0].Type;
             
-            var vectorHolderTypeName = ((PolarDriverOptions)Context.Options).VectorHolderName;
+            //var vectorHolderTypeName = ((PolarDriverOptions)Context.Options).VectorHolderName;
 
             Type type = ctx.Parameter.Type.Desugar();
             ClassTemplateSpecialization basicString = GetBasicString(type);
@@ -531,7 +531,7 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             ClassTemplateSpecialization basicString = GetBasicString(templateType);
             var typePrinter = new CSharpTypePrinter(ctx.Context);
 
-            var vectorHolderTypeName = ((PolarDriverOptions)Context.Options).VectorHolderName;
+            //var vectorHolderTypeName = ((PolarDriverOptions)Context.Options).VectorHolderName;
             
             var typeCast = $"({typePrinter.PrintNative(basicString)})";
             // So we have the case that when the arg name is not generated, i.e. "_ret", its ReturnVarName is
