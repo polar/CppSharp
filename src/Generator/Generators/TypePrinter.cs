@@ -1,4 +1,5 @@
 ﻿using CppSharp.AST;
+using CppSharp.Types;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -8,7 +9,10 @@ namespace CppSharp.Generators
     public class TypePrinterResult
     {
         public string Type { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public StringBuilder NamePrefix { get; set; } = new StringBuilder();
         public StringBuilder NameSuffix { get; set; } = new StringBuilder();
+        public TypeMap TypeMap { get; set; }
 
         public TypePrinterResult(string type = "", string nameSuffix = "")
         {
@@ -22,9 +26,15 @@ namespace CppSharp.Generators
         public static implicit operator string(TypePrinterResult result) =>
            result.ToString();
 
-        public override string ToString() =>
-            NameSuffix.Length > 0 ? Type.Contains("{0}") ?
-            string.Format(Type, NameSuffix) : Type + NameSuffix : Type;
+        public override string ToString()
+        {
+            bool hasPlaceholder = Type.Contains("{0}");
+            if (hasPlaceholder)
+                return string.Format(Type, $"{NamePrefix}{Name}{NameSuffix}");
+
+            var namePrefix = (Name.Length > 0) ? $"{NamePrefix} " : NamePrefix.ToString();
+            return $"{Type}{namePrefix}{Name}{NameSuffix}";
+        }
     }
 
     public class TypePrinter : ITypePrinter<TypePrinterResult>,
@@ -42,11 +52,11 @@ namespace CppSharp.Generators
         public TypePrintScopeKind ScopeKind = TypePrintScopeKind.GlobalQualified;
         public bool IsGlobalQualifiedScope => ScopeKind == TypePrintScopeKind.GlobalQualified;
 
-        public TypePrinter()
+        public TypePrinter(TypePrinterContextKind contextKind = TypePrinterContextKind.Managed)
         {
             contexts = new Stack<TypePrinterContextKind>();
             marshalKinds = new Stack<MarshalKind>();
-            PushContext(TypePrinterContextKind.Managed);
+            PushContext(contextKind);
             PushMarshalKind(MarshalKind.Unknown);
         }
 

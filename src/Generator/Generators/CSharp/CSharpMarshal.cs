@@ -312,7 +312,7 @@ namespace CppSharp.Generators.CSharp
                 Context.Return.Write($"({returnType.Visit(typePrinter)}) (object) ");
 
             if (returnType.IsAddress())
-                Context.Return.Write(HandleReturnedPointer(@class, qualifiedClass.Type));
+                Context.Return.Write(HandleReturnedPointer(@class, qualifiedClass));
             else
                 Context.Return.Write($"{qualifiedClass}.{Helpers.CreateInstanceIdentifier}({Context.ReturnVarName})");
 
@@ -590,10 +590,16 @@ namespace CppSharp.Generators.CSharp
                     return true;
                 }
 
+                bool isConst = quals.IsConst || pointer.QualifiedPointee.Qualifiers.IsConst ||
+                     pointer.GetFinalQualifiedPointee().Qualifiers.IsConst;
+
                 if (Context.Context.Options.MarshalCharAsManagedChar &&
                     primitive == PrimitiveType.Char)
                 {
-                    Context.Return.Write($"({typePrinter.PrintNative(pointer)}) &{param.Name}");
+                    Context.Return.Write($"({typePrinter.PrintNative(pointer)})");
+                    if (isConst)
+                        Context.Return.Write("&");
+                    Context.Return.Write(param.Name);
                     return true;
                 }
 
@@ -601,18 +607,13 @@ namespace CppSharp.Generators.CSharp
 
                 if (Context.Parameter.IsIndirect)
                     Context.ArgumentPrefix.Write("&");
-
-                bool isVoid = primitive == PrimitiveType.Void &&
-                    pointee.IsAddress() && pointer.IsReference() &&
-                    (quals.IsConst || pointer.QualifiedPointee.Qualifiers.IsConst ||
-                     pointer.GetFinalQualifiedPointee().Qualifiers.IsConst);
-                if (pointer.Pointee.Desugar(false) is TemplateParameterSubstitutionType ||
-                    isVoid)
+                bool isVoid = primitive == PrimitiveType.Void && pointer.IsReference() && isConst;
+                if (pointer.Pointee.Desugar(false) is TemplateParameterSubstitutionType || isVoid)
                 {
                     var local = Generator.GeneratedIdentifier($@"{
                         param.Name}{Context.ParameterIndex}");
                     string cast = isVoid ? $@"({pointee.Visit(
-                        new CppTypePrinter { PrintTypeQualifiers = false })}) " : string.Empty;
+                        new CppTypePrinter(Context.Context) { PrintTypeQualifiers = false })}) " : string.Empty;
                     Context.Before.WriteLine($"var {local} = {cast}{Context.Return};");
                     Context.Return.StringBuilder.Clear();
                     Context.Return.Write(local);

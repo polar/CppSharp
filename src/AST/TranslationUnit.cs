@@ -73,6 +73,7 @@ namespace CppSharp.AST
         {
             get
             {
+                if (!IsValid) return string.Empty;
                 return fileRelativePath ??
                     (fileRelativePath = Path.Combine(FileRelativeDirectory, FileName));
             }
@@ -82,5 +83,7 @@ namespace CppSharp.AST
         {
             return visitor.VisitTranslationUnit(this);
         }
+
+        public override string ToString() => FileName;
     }
 }

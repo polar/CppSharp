@@ -96,11 +96,8 @@ namespace CppSharp.Generators
         public virtual void GenerateDebug(Declaration decl)
         {
             if (Options.GenerateDebugOutput && !string.IsNullOrWhiteSpace(decl.DebugText))
-            {
-                var debugText = decl.DebugText;
-                debugText = Regex.Replace(debugText.Trim(), "\r?\n", "\n// DEBUG: ");
-                WriteLine($"// DEBUG: {debugText}");
-            }
+                foreach (var line in Regex.Split(decl.DebugText.Trim(), "\r?\n"))
+                    WriteLine($"// DEBUG: {line}");
         }
 
         #endregion
@@ -250,7 +247,7 @@ namespace CppSharp.Generators
 
         public virtual bool VisitTranslationUnit(TranslationUnit unit)
         {
-            return VisitDeclContext(unit);
+            return VisitNamespace(unit);
         }
 
         public virtual bool VisitDeclContext(DeclarationContext context)
@@ -1209,7 +1206,7 @@ namespace CppSharp.Generators
         public static readonly string InternalStruct = Generator.GeneratedIdentifier("Internal");
         public static readonly string InstanceField = Generator.GeneratedIdentifier("instance");
         public static readonly string InstanceIdentifier = Generator.GeneratedIdentifier("Instance");
-        public static readonly string PointerAdjustmentIdentifier = Generator.GeneratedIdentifier("PointerAdjustment");
+        public static readonly string PrimaryBaseOffsetIdentifier = Generator.GeneratedIdentifier("PrimaryBaseOffset");
         public static readonly string ReturnIdentifier = Generator.GeneratedIdentifier("ret");
         public static readonly string DummyIdentifier = Generator.GeneratedIdentifier("dummy");
         public static readonly string TargetIdentifier = Generator.GeneratedIdentifier("target");

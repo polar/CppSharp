@@ -234,14 +234,14 @@ public:
     bool TestPrimitiveOut(CS_OUT float* f);
     bool TestPrimitiveOutRef(CS_OUT float& f);
 
-    bool TestPrimitiveInOut(CS_IN_OUT int* i);
-    bool TestPrimitiveInOutRef(CS_IN_OUT int& i);
+    bool TestPrimitiveInOut(int* i);
+    bool TestPrimitiveInOutRef(int& i);
 
     void EnumOut(int value, CS_OUT Enum* e);
     void EnumOutRef(int value, CS_OUT Enum& e);
 
-    void EnumInOut(CS_IN_OUT Enum* e);
-    void EnumInOutRef(CS_IN_OUT Enum& e);
+    void EnumInOut(Enum* e);
+    void EnumInOutRef(Enum& e);
 
     void StringOut(CS_OUT const char** str);
     void StringOutRef(CS_OUT const char*& str);
@@ -274,6 +274,7 @@ class DLL_API ReturnsAbstractFoo
 {
 public:
     ReturnsAbstractFoo();
+    ~ReturnsAbstractFoo();
     const AbstractFoo& getFoo();
 
 private:
@@ -589,6 +590,12 @@ public:
         Value2
     };
 
+    enum class Conflict
+    {
+        Value1,
+        Value2
+    };
+
     TestProperties();
     TestProperties(const TestProperties& other);
     int Field;
@@ -605,6 +612,10 @@ public:
     int getterAndSetterWithTheSameName();
     void getterAndSetterWithTheSameName(int value);
 
+    int Get() const;
+    void Set(int value);
+
+    int get() const;
     void set(int value);
 
     int setterReturnsBoolean();
@@ -630,12 +641,17 @@ public:
 
     bool contains(char c);
     bool contains(const char* str);
+
+    Conflict GetConflict();
+    void SetConflict(Conflict _conflict);
+
 private:
     int FieldValue;
     double _refToPrimitiveInSetter;
     int _getterAndSetterWithTheSameName;
     int _setterReturnsBoolean;
     int _virtualSetterReturnsBoolean;
+    Conflict _conflict;
 };
 
 class DLL_API HasOverridenSetter : public TestProperties
@@ -767,6 +783,22 @@ TestArraysPointers::TestArraysPointers(MyEnum *values, int count)
 {
     if (values && count) Value = values[0];
 }
+
+class DLL_API NonPrimitiveType
+{
+
+public:
+    int GetFoo();
+
+    int foo;
+};
+
+class DLL_API TestFixedNonPrimitiveArrays
+{
+public:
+    TestFixedNonPrimitiveArrays();
+    NonPrimitiveType NonPrimitiveTypeArray[3];
+};
 
 struct DLL_API TestGetterSetterToProperties
 {
@@ -1519,6 +1551,8 @@ DLL_API void takeVoidStarStar(void** p);
 DLL_API void overloadPointer(void* p, int i = 0);
 DLL_API void overloadPointer(const void* p, int i = 0);
 DLL_API const char* takeReturnUTF8(const char* utf8);
+typedef const char* LPCSTR;
+DLL_API LPCSTR TakeTypedefedMappedType(LPCSTR string);
 DLL_API std::string UTF8;
 
 struct DLL_API StructWithCopyCtor
@@ -1574,3 +1608,15 @@ class TemplateClass : TemplateClassBase<A,B> {
     using Func = std::function<B(XType)>;
     explicit TemplateClass(Func function) {}
 };
+
+struct DLL_API PointerToTypedefPointerTest
+{
+    int val;
+};
+typedef PointerToTypedefPointerTest *LPPointerToTypedefPointerTest;
+
+void DLL_API PointerToTypedefPointerTestMethod(LPPointerToTypedefPointerTest* lp, int valToSet);
+
+typedef int *LPINT;
+
+void DLL_API PointerToPrimitiveTypedefPointerTestMethod(LPINT lp, int valToSet);

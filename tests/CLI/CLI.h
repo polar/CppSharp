@@ -1,6 +1,13 @@
 #include "../Tests.h"
 
+#include "UseTemplateTypeFromIgnoredClassTemplate/Employee.h"
+#include "UseTemplateTypeFromIgnoredClassTemplate/EmployeeOrg.h"
+
+#include "NestedEnumInClassTest/ClassWithNestedEnum.h"
+#include "NestedEnumInClassTest/NestedEnumConsumer.h"
+
 #include <ostream>
+#include <vector>
 
 // Tests for C++ types
 struct DLL_API Types
@@ -56,3 +63,69 @@ typedef struct IncompleteStruct IncompleteStruct;
 
 DLL_API IncompleteStruct* createIncompleteStruct();
 DLL_API void useIncompleteStruct(IncompleteStruct* a);
+
+class DLL_API TestMappedTypeNonConstRefParam
+{
+public:
+    TestMappedTypeNonConstRefParam(const std::string);
+    const TestMappedTypeNonConstRefParam& operator=(const std::string);
+
+    std::string m_str;
+};
+
+class DLL_API TestMappedTypeNonConstRefParamConsumer
+{
+public:
+    void ChangePassedMappedTypeNonConstRefParam(TestMappedTypeNonConstRefParam&);
+};
+
+class DLL_API VectorPointerGetter
+{
+public:
+    VectorPointerGetter();
+    ~VectorPointerGetter();
+
+    std::vector<std::string>* GetVecPtr();
+
+private:
+    std::vector<std::string>* vecPtr;
+};
+
+// Previously passing multiple constant arrays was generating the same variable name for each array inside the method body.
+// This is fixed by using the same generation code in CLIMarshal.VisitArrayType for both when there is a return var name specified and
+// for when no return var name is specified.
+std::string DLL_API MultipleConstantArraysParamsTestMethod(char arr1[9], char arr2[10]);
+
+// Ensures marshalling arrays is handled correctly for value types used within reference types.
+union DLL_API UnionNestedInsideStruct
+{
+    char szText[10];
+};
+
+struct DLL_API StructWithNestedUnion
+{
+    UnionNestedInsideStruct nestedUnion;
+};
+
+std::string DLL_API StructWithNestedUnionTestMethod(StructWithNestedUnion val);
+
+// Ensures marshalling arrays is handled correctly for reference types used within value types.
+struct DLL_API StructNestedInsideUnion
+{
+    char szText[10];
+};
+
+union DLL_API UnionWithNestedStruct
+{
+    StructNestedInsideUnion nestedStruct;
+};
+
+std::string DLL_API UnionWithNestedStructTestMethod(UnionWithNestedStruct val);
+
+// Ensures marshalling arrays is handled corectly for arrays of reference types used within value types.
+union DLL_API UnionWithNestedStructArray
+{
+    StructNestedInsideUnion nestedStructs[2];
+};
+
+std::string DLL_API UnionWithNestedStructArrayTestMethod(UnionWithNestedStructArray val);

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using CppSharp.AST;
 using CppSharp.AST.Extensions;
+using CppSharp.Generators;
 using CppSharp.Generators.C;
 using CppSharp.Generators.CSharp;
 using CppSharp.Passes;
@@ -12,9 +13,14 @@ namespace CppSharp.Generator.Tests.AST
     [TestFixture]
     public class TestAST : ASTTestFixture
     {
+        private BindingContext Context;
+
         [OneTimeSetUp]
         public void Init()
         {
+            Context = new BindingContext(new DriverOptions());
+            Context.TypeMaps = new Types.TypeMapDatabase(Context);
+
             CppSharp.AST.Type.TypePrinterDelegate = type =>
             {
                 PrimitiveType primitiveType;
@@ -287,10 +293,10 @@ namespace CppSharp.Generator.Tests.AST
             var paramType = ctor.Parameters[0].Type as TemplateParameterType;
             Assert.IsNotNull(paramType);
             Assert.AreEqual(templateTypeParameter, paramType.Parameter);
-            Assert.AreEqual(5, template.Specializations.Count);
+            Assert.AreEqual(6, template.Specializations.Count);
             Assert.AreEqual(TemplateSpecializationKind.ExplicitInstantiationDefinition, template.Specializations[0].SpecializationKind);
-            Assert.AreEqual(TemplateSpecializationKind.ExplicitInstantiationDefinition, template.Specializations[3].SpecializationKind);
-            Assert.AreEqual(TemplateSpecializationKind.Undeclared, template.Specializations[4].SpecializationKind);
+            Assert.AreEqual(TemplateSpecializationKind.ExplicitInstantiationDefinition, template.Specializations[4].SpecializationKind);
+            Assert.AreEqual(TemplateSpecializationKind.Undeclared, template.Specializations[5].SpecializationKind);
             var typeDef = AstContext.FindTypedef("TestTemplateClassInt").FirstOrDefault();
             Assert.IsNotNull(typeDef, "Couldn't find TestTemplateClassInt typedef.");
             var integerInst = typeDef.Type as TemplateSpecializationType;
@@ -300,6 +306,18 @@ namespace CppSharp.Generator.Tests.AST
             ClassTemplateSpecialization classTemplateSpecialization;
             Assert.IsTrue(typeDef.Type.TryGetDeclaration(out classTemplateSpecialization));
             Assert.AreSame(classTemplateSpecialization.TemplatedDecl.TemplatedClass, template.TemplatedClass);
+        }
+
+        [Test]
+        public void TestDeprecatedAttrs()
+        {
+            var deprecated_func = AstContext.FindFunction("deprecated_func");
+            Assert.IsNotNull(deprecated_func);
+            Assert.IsTrue(deprecated_func.First().IsDeprecated);
+
+            var non_deprecated_func = AstContext.FindFunction("non_deprecated_func");
+            Assert.IsNotNull(non_deprecated_func);
+            Assert.IsFalse(non_deprecated_func.First().IsDeprecated);
         }
 
         [Test]
@@ -473,7 +491,7 @@ namespace CppSharp.Generator.Tests.AST
         [Test]
         public void TestPrintingConstPointerWithConstType()
         {
-            var cppTypePrinter = new CppTypePrinter { ScopeKind = TypePrintScopeKind.Qualified };
+            var cppTypePrinter = new CppTypePrinter(Context) { ScopeKind = TypePrintScopeKind.Qualified };
             var builtin = new BuiltinType(PrimitiveType.Char);
             var pointee = new QualifiedType(builtin, new TypeQualifiers { IsConst = true });
             var pointer = new QualifiedType(new PointerType(pointee), new TypeQualifiers { IsConst = true });
@@ -485,7 +503,7 @@ namespace CppSharp.Generator.Tests.AST
         public void TestPrintingSpecializationWithConstValue()
         {
             var template = AstContext.FindDecl<ClassTemplate>("TestSpecializationArguments").First();
-            var cppTypePrinter = new CppTypePrinter { ScopeKind = TypePrintScopeKind.Qualified };
+            var cppTypePrinter = new CppTypePrinter(Context) { ScopeKind = TypePrintScopeKind.Qualified };
             Assert.That(template.Specializations.Last().Visit(cppTypePrinter).Type,
                 Is.EqualTo("TestSpecializationArguments<const TestASTEnumItemByName>"));
         }
@@ -537,7 +555,7 @@ namespace CppSharp.Generator.Tests.AST
         [Test]
         public void TestVolatile()
         {
-            var cppTypePrinter = new CppTypePrinter { ScopeKind = TypePrintScopeKind.Qualified };
+            var cppTypePrinter = new CppTypePrinter(Context) { ScopeKind = TypePrintScopeKind.Qualified };
             var builtin = new BuiltinType(PrimitiveType.Char);
             var pointee = new QualifiedType(builtin, new TypeQualifiers { IsConst = true, IsVolatile = true });
             var type = pointee.Visit(cppTypePrinter).Type;
@@ -555,8 +573,8 @@ namespace CppSharp.Generator.Tests.AST
         public void TestPrintNestedInSpecialization()
         {
             var template = AstContext.FindDecl<ClassTemplate>("TestTemplateClass").First();
-            var cppTypePrinter = new CppTypePrinter { ScopeKind = TypePrintScopeKind.Qualified };
-            Assert.That(template.Specializations[3].Classes.First().Visit(cppTypePrinter).Type,
+            var cppTypePrinter = new CppTypePrinter(Context) { ScopeKind = TypePrintScopeKind.Qualified };
+            Assert.That(template.Specializations[4].Classes.First().Visit(cppTypePrinter).Type,
                 Is.EqualTo("TestTemplateClass<Math::Complex>::NestedInTemplate"));
         }
 
@@ -564,7 +582,7 @@ namespace CppSharp.Generator.Tests.AST
         public void TestPrintQualifiedSpecialization()
         {
             var functionWithSpecializationArg = AstContext.FindFunction("functionWithSpecializationArg").First();
-            var cppTypePrinter = new CppTypePrinter { ScopeKind = TypePrintScopeKind.Qualified };
+            var cppTypePrinter = new CppTypePrinter(Context) { ScopeKind = TypePrintScopeKind.Qualified };
             Assert.That(functionWithSpecializationArg.Parameters[0].Visit(cppTypePrinter).Type,
                 Is.EqualTo("const TestTemplateClass<int>"));
         }
@@ -601,6 +619,33 @@ namespace CppSharp.Generator.Tests.AST
 
             var @classC = AstContext.FindClass("ClassC").First();
             Assert.That(@classC.Redeclarations.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TestPrivateCCtorCopyAssignment()
+        {
+            Class @class = AstContext.FindCompleteClass("HasPrivateCCtorCopyAssignment");
+            Assert.That(@class.Constructors.Any(c => c.Parameters.Count == 0), Is.True);
+            Assert.That(@class.Constructors.Any(c => c.IsCopyConstructor), Is.True);
+            Assert.That(@class.Methods.Any(o => o.OperatorKind == CXXOperatorKind.Equal), Is.True);
+        }
+
+        [Test]
+        public void TestCompletionSpecializationInFunction()
+        {
+            Function function = AstContext.FindFunction("returnIncompleteTemplateSpecialization").First();
+            function.ReturnType.Type.TryGetClass(out Class specialization);
+            Assert.That(specialization.IsIncomplete, Is.False);
+        }
+
+        [Test]
+        public void TestPreprocessedEntities()
+        {
+            var unit = AstContext.TranslationUnits.First(u => u.FileName == "AST.h");
+            var macro = unit.PreprocessedEntities.OfType<MacroDefinition>()
+                .FirstOrDefault(exp => exp.Name == "MACRO");
+            Assert.NotNull(macro);
+            Assert.AreEqual("(x, y, z) x##y##z", macro.Expression);
         }
     }
 }

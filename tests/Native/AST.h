@@ -201,6 +201,7 @@ class ForwardedTemplate;
 
 typedef ForwardedTemplate<int> i;
 typedef ForwardedTemplate<long> l;
+typedef TestTemplateClass<double> forceInSpecializations;
 
 template class TestSpecializationArguments<const TestASTEnumItemByName>;
 
@@ -237,3 +238,18 @@ class ClassB;
 class ClassC {};
 class ClassC;
 class ClassC;
+
+class HasPrivateCCtorCopyAssignment
+{
+private:
+    HasPrivateCCtorCopyAssignment() = delete;
+    HasPrivateCCtorCopyAssignment(const HasPrivateCCtorCopyAssignment&) = delete;
+    HasPrivateCCtorCopyAssignment& operator=(const HasPrivateCCtorCopyAssignment&) = delete;
+};
+
+__attribute__((deprecated)) int deprecated_func(int num);
+int non_deprecated_func(int num);
+
+TestTemplateClass<double> returnIncompleteTemplateSpecialization();
+
+#define MACRO(x, y, z) x##y##z

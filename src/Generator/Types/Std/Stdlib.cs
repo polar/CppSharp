@@ -91,7 +91,8 @@ namespace CppSharp.Types.Std
         }
     }
 
-    [TypeMap("const char*")]
+    [TypeMap("const char*", GeneratorKind = GeneratorKind.CSharp)]
+    [TypeMap("const char*", GeneratorKind = GeneratorKind.CLI)]
     public class ConstCharPointer : TypeMap
     {
         public override Type CLISignatureType(TypePrinterContext ctx)
@@ -302,22 +303,26 @@ namespace CppSharp.Types.Std
         }
     }
 
-    [TypeMap("const char[]")]
+    [TypeMap("const char[]", GeneratorKind = GeneratorKind.CSharp)]
+    [TypeMap("const char[]", GeneratorKind = GeneratorKind.CLI)]
     public class ConstCharArray : ConstCharPointer
     {
     }
 
-    [TypeMap("const wchar_t*")]
+    [TypeMap("const wchar_t*", GeneratorKind = GeneratorKind.CSharp)]
+    [TypeMap("const wchar_t*", GeneratorKind = GeneratorKind.CLI)]
     public class ConstWCharTPointer : ConstCharPointer
     {
     }
 
-    [TypeMap("const char16_t*")]
+    [TypeMap("const char16_t*", GeneratorKind = GeneratorKind.CSharp)]
+    [TypeMap("const char16_t*", GeneratorKind = GeneratorKind.CLI)]
     public class ConstChar16TPointer : ConstCharPointer
     {
     }
 
-    [TypeMap("basic_string<char, char_traits<char>, allocator<char>>")]
+    [TypeMap("basic_string<char, char_traits<char>, allocator<char>>", GeneratorKind = GeneratorKind.CSharp)]
+    [TypeMap("basic_string<char, char_traits<char>, allocator<char>>", GeneratorKind = GeneratorKind.CLI)]
     public class String : TypeMap
     {
         public override Type CLISignatureType(TypePrinterContext ctx)
@@ -561,7 +566,8 @@ namespace CppSharp.Types.Std
 
         public override void CLIMarshalToNative(MarshalContext ctx)
         {
-            var templateType = Type as TemplateSpecializationType;
+            var desugared = Type.Desugar();
+            var templateType = desugared as TemplateSpecializationType;
             var type = templateType.Arguments[0].Type;
             var isPointerToPrimitive = type.Type.IsPointerToPrimitiveType();
             var managedType = isPointerToPrimitive
@@ -573,7 +579,7 @@ namespace CppSharp.Types.Std
 
             var tmpVarName = "_tmp" + entryString;
 
-            var cppTypePrinter = new CppTypePrinter();
+            var cppTypePrinter = new CppTypePrinter(Context);
             var nativeType = type.Type.Visit(cppTypePrinter);
 
             ctx.Before.WriteLine("auto {0} = std::vector<{1}>();",
@@ -618,7 +624,8 @@ namespace CppSharp.Types.Std
 
         public override void CLIMarshalToManaged(MarshalContext ctx)
         {
-            var templateType = Type as TemplateSpecializationType;
+            var desugared = Type.Desugar();
+            var templateType = desugared as TemplateSpecializationType;
             var type = templateType.Arguments[0].Type;
             var isPointerToPrimitive = type.Type.IsPointerToPrimitiveType();
             var managedType = isPointerToPrimitive
@@ -629,8 +636,10 @@ namespace CppSharp.Types.Std
             ctx.Before.WriteLine(
                 "auto {0} = gcnew System::Collections::Generic::List<{1}>();",
                 tmpVarName, managedType);
+
+            string retVarName = ctx.ReturnType.Type.Desugar().IsPointer() ? $"*{ctx.ReturnVarName}" : ctx.ReturnVarName;
             ctx.Before.WriteLine("for(auto _element : {0})",
-                ctx.ReturnVarName);
+                retVarName);
             ctx.Before.WriteOpenBraceAndIndent();
             {
                 var elementCtx = new MarshalContext(ctx.Context, ctx.Indentation)
@@ -760,13 +769,16 @@ namespace CppSharp.Types.Std
         {
             var typeRef = collector.GetTypeReference(loc.Value);
 
-            var include = new CInclude
+            if (typeRef != null)
             {
-                File = "cstddef",
-                Kind = CInclude.IncludeKind.Angled,
-            };
+                var include = new CInclude
+                {
+                    File = "cstddef",
+                    Kind = CInclude.IncludeKind.Angled,
+                };
 
-            typeRef.Include = include;
+                typeRef.Include = include;
+            }
         }
     }
 

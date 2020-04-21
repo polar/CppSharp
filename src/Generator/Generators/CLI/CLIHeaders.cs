@@ -154,9 +154,7 @@ namespace CppSharp.Generators.CLI
                 if (!@enum.IsGenerated || @enum.IsIncomplete)
                     continue;
 
-                PushBlock(BlockKind.Enum, @enum);
-                GenerateEnum(@enum);
-                PopBlock(NewLineKind.BeforeNextBlock);
+                @enum.Visit(this);
             }
 
             // Generate all the typedef declarations for the module.
@@ -220,7 +218,7 @@ namespace CppSharp.Generators.CLI
 
         public void GenerateFunctions(DeclarationContext decl)
         {
-            PushBlock(BlockKind.FunctionsClass);
+            PushBlock(BlockKind.FunctionsClass, decl);
 
             WriteLine("public ref class {0}", TranslationUnit.FileNameWithoutExtension);
             WriteLine("{");
@@ -378,6 +376,7 @@ namespace CppSharp.Generators.CLI
 
             // Output a default constructor that takes the native pointer.
             WriteLine("{0}({1} native);", @class.Name, nativeType);
+            WriteLine("{0}({1} native, bool ownNativeInstance);", @class.Name, nativeType);
             WriteLine("static {0}^ {1}(::System::IntPtr native);",
                 @class.Name, Helpers.CreateInstanceIdentifier);
 
@@ -467,7 +466,7 @@ namespace CppSharp.Generators.CLI
             {
                 if (!@event.IsGenerated) continue;
 
-                var cppTypePrinter = new CppTypePrinter();
+                var cppTypePrinter = new CppTypePrinter(Context);
                 var cppArgs = cppTypePrinter.VisitParameters(@event.Parameters, hasNames: true);
 
                 WriteLine("private:");
@@ -628,10 +627,10 @@ namespace CppSharp.Generators.CLI
 
         public void GenerateIndexer(Property property)
         {
-            var type = property.QualifiedType.Visit(TypePrinter);
+            var type = property.QualifiedType.Visit(CTypePrinter);
             var getter = property.GetMethod;
             var indexParameter = getter.Parameters[0];
-            var indexParameterType = indexParameter.QualifiedType.Visit(TypePrinter);
+            var indexParameterType = indexParameter.QualifiedType.Visit(CTypePrinter);
 
             WriteLine("property {0} default[{1}]", type, indexParameterType);
             WriteOpenBraceAndIndent();
@@ -651,7 +650,7 @@ namespace CppSharp.Generators.CLI
                 return;
 
             PushBlock(BlockKind.Property, property);
-            var type = property.QualifiedType.Visit(TypePrinter);
+            var type = property.QualifiedType.Visit(CTypePrinter);
 
             if (property.IsStatic)
                 Write("static ");
@@ -761,10 +760,11 @@ namespace CppSharp.Generators.CLI
                         "(System::Runtime::InteropServices::CallingConvention::{0})] ",
                         interopCallConv);
 
-                WriteLine("{0}{1};",
-                    !insideClass ? "public " : "",
-                    string.Format(TypePrinter.VisitDelegate(functionType).ToString(),
-                    typedef.Name));
+                var visibility = !insideClass ? "public " : string.Empty;
+                var result = CTypePrinter.VisitDelegate(functionType);
+                result.Name = typedef.Name;
+                WriteLine($"{visibility}{result};");
+
                 PopBlock(NewLineKind.BeforeNextBlock);
 
                 return true;
@@ -804,43 +804,6 @@ namespace CppSharp.Generators.CLI
             var finalType = (desugared.GetFinalPointee() ?? desugared).Desugar();
             Class @class;
             return finalType.TryGetClass(out @class) && @class.IsIncomplete;
-        }
-
-        public void GenerateEnum(Enumeration @enum)
-        {
-            if (!@enum.IsGenerated || @enum.IsIncomplete)
-                return;
-
-            PushBlock(BlockKind.Enum, @enum);
-
-            GenerateDeclarationCommon(@enum);
-
-            if (@enum.Modifiers.HasFlag(Enumeration.EnumModifiers.Flags))
-                WriteLine("[System::Flags]");
-
-            // A nested class cannot have an assembly access specifier as part
-            // of its declaration.
-            if (@enum.Namespace is Namespace)
-                Write("public ");
-
-            Write("enum struct {0}", @enum.Name);
-
-            var typeName = TypePrinter.VisitPrimitiveType(@enum.BuiltinType.Type,
-                new TypeQualifiers());
-
-            if (@enum.BuiltinType.Type != PrimitiveType.Int &&
-                @enum.BuiltinType.Type != PrimitiveType.Null)
-                Write(" : {0}", typeName);
-
-            NewLine();
-            WriteOpenBraceAndIndent();
-
-            GenerateEnumItems(@enum);
-
-            Unindent();
-            WriteLine("};");
-
-            PopBlock(NewLineKind.BeforeNextBlock);
         }
     }
 }

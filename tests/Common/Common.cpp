@@ -260,13 +260,13 @@ bool Hello::TestPrimitiveOutRef(CS_OUT float& f)
     return true;
 }
 
-bool Hello::TestPrimitiveInOut(CS_IN_OUT int* i)
+bool Hello::TestPrimitiveInOut(int* i)
 {
     *i += 10;
     return true;
 }
 
-bool Hello::TestPrimitiveInOutRef(CS_IN_OUT int& i)
+bool Hello::TestPrimitiveInOutRef(int& i)
 {
     i += 10;
     return true;
@@ -282,16 +282,16 @@ void Hello::EnumOutRef(int value, CS_OUT Enum& e)
     e = (Enum)value;
 }
 
-void Hello::EnumInOut(CS_IN_OUT Enum* e)
+void Hello::EnumInOut(Enum* e)
 {
-        if (*e == Enum::E)
-                *e = Enum::F;
+    if (*e == Enum::E)
+        *e = Enum::F;
 }
 
-void Hello::EnumInOutRef(CS_IN_OUT Enum& e)
+void Hello::EnumInOutRef(Enum& e)
 {
-        if (e == Enum::E)
-                e = Enum::F;
+    if (e == Enum::E)
+        e = Enum::F;
 }
 
 void Hello::StringOut(CS_OUT const char** str)
@@ -379,6 +379,8 @@ int ImplementsAbstractFoo::pureFunction2(bool* ok)
 }
 
 ReturnsAbstractFoo::ReturnsAbstractFoo() {}
+
+ReturnsAbstractFoo::~ReturnsAbstractFoo() {}
 
 const AbstractFoo& ReturnsAbstractFoo::getFoo()
 {
@@ -539,7 +541,8 @@ SomeNamespace::AbstractClass::~AbstractClass()
 }
 
 TestProperties::TestProperties() : Field(0), _refToPrimitiveInSetter(0),
-    _getterAndSetterWithTheSameName(0), _setterReturnsBoolean(0), _virtualSetterReturnsBoolean(0)
+    _getterAndSetterWithTheSameName(0), _setterReturnsBoolean(0),
+    _virtualSetterReturnsBoolean(0), _conflict(Conflict::Value1)
 {
 }
 
@@ -548,7 +551,8 @@ TestProperties::TestProperties(const TestProperties& other) : Field(other.Field)
     _refToPrimitiveInSetter(other._refToPrimitiveInSetter),
     _getterAndSetterWithTheSameName(other._getterAndSetterWithTheSameName),
     _setterReturnsBoolean(other._setterReturnsBoolean),
-    _virtualSetterReturnsBoolean(other._virtualSetterReturnsBoolean)
+    _virtualSetterReturnsBoolean(other._virtualSetterReturnsBoolean),
+    _conflict(other._conflict)
 {
 }
 
@@ -591,7 +595,21 @@ void TestProperties::getterAndSetterWithTheSameName(int value)
     _getterAndSetterWithTheSameName = value;
 }
 
+int TestProperties::get() const
+{
+    return 3;
+}
+
 void TestProperties::set(int value)
+{
+}
+
+int TestProperties::Get() const
+{
+    return 3;
+}
+
+void TestProperties::Set(int value)
 {
 }
 
@@ -675,6 +693,16 @@ bool TestProperties::contains(char c)
 bool TestProperties::contains(const char* str)
 {
     return true;
+}
+
+TestProperties::Conflict TestProperties::GetConflict()
+{
+    return _conflict;
+}
+
+void TestProperties::SetConflict(Conflict conflict)
+{
+    _conflict = conflict;
 }
 
 HasOverridenSetter::HasOverridenSetter()
@@ -1152,6 +1180,12 @@ const char* takeReturnUTF8(const char* utf8)
     return UTF8.data();
 }
 
+LPCSTR TakeTypedefedMappedType(LPCSTR string)
+{
+    UTF8 = string;
+    return UTF8.data();
+}
+
 StructWithCopyCtor::StructWithCopyCtor() {}
 StructWithCopyCtor::StructWithCopyCtor(const StructWithCopyCtor& other) : mBits(other.mBits) {}
 
@@ -1166,4 +1200,23 @@ BaseCovariant::~BaseCovariant()
 
 DerivedCovariant::~DerivedCovariant()
 {
+}
+
+int NonPrimitiveType::GetFoo()
+{
+    return foo;
+}
+
+TestFixedNonPrimitiveArrays::TestFixedNonPrimitiveArrays() 
+{
+}
+
+void DLL_API PointerToTypedefPointerTestMethod(LPPointerToTypedefPointerTest* lp, int valToSet)
+{
+    (*(*lp)).val = valToSet;
+}
+
+void DLL_API PointerToPrimitiveTypedefPointerTestMethod(LPINT lp, int valToSet)
+{
+    *lp = valToSet;
 }

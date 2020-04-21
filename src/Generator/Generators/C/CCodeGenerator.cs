@@ -20,18 +20,26 @@ namespace CppSharp.Generators.C
 
         public override string ToString()
         {
-            return string.Format(Kind == IncludeKind.Angled ?
-                "#include <{0}>" : "#include \"{0}\"", File);
+            return Kind == IncludeKind.Angled ?
+                $"#include <{File}>" : $"#include \"{File}\"";
         }
     }
 
     public abstract class CCodeGenerator : CodeGenerator
     {
-        public CCodeGenerator(BindingContext context)
-            : base(context)
+        public CCodeGenerator(BindingContext context,
+            IEnumerable<TranslationUnit> units = null)
+            : base(context, units)
         {
             VisitOptions.VisitPropertyAccessors = true;
+            typePrinter = new CppTypePrinter(context);
         }
+
+        public abstract override string FileExtension { get; }
+
+        public abstract override void Process();
+
+        public ISet<CInclude> Includes = new HashSet<CInclude>();
 
         public virtual string QualifiedName(Declaration decl)
         {
@@ -41,8 +49,23 @@ namespace CppSharp.Generators.C
             return decl.QualifiedName;
         }
 
-        private CppTypePrinter typePrinter = new CppTypePrinter();
+        public string QualifiedIdentifier(Declaration decl)
+        {
+            if (!string.IsNullOrEmpty(TranslationUnit.Module.OutputNamespace))
+            {
+                if (string.IsNullOrEmpty(decl.QualifiedName))
+                    return $"{decl.TranslationUnit.Module.OutputNamespace}";
+
+                return $"{decl.TranslationUnit.Module.OutputNamespace}::{decl.QualifiedName}";
+            }
+
+            return decl.QualifiedName;
+        }
+
+        protected CppTypePrinter typePrinter;
         public virtual CppTypePrinter CTypePrinter => typePrinter;
+
+        public bool IsCLIGenerator => Context.Options.GeneratorKind == GeneratorKind.CLI;
 
         public virtual void WriteHeaders() { }
 
@@ -62,16 +85,6 @@ namespace CppSharp.Generators.C
             return decl.IsGenerated && !AlreadyVisited(decl);
         }
 
-        public virtual string GetMethodIdentifier(Method method) => method.Name;
-
-        public override void GenerateMethodSpecifier(Method method, Class @class)
-        {
-            var retType = method.ReturnType.Visit(CTypePrinter);
-            Write($"{retType} {GetMethodIdentifier(method)}(");
-            Write(CTypePrinter.VisitParameters(method.Parameters));
-            Write(")");
-        }
-
         public override bool VisitTypedefDecl(TypedefDecl typedef)
         {
             if (!VisitDeclaration(typedef))
@@ -79,8 +92,9 @@ namespace CppSharp.Generators.C
 
             PushBlock();
 
-            var typeName = typedef.Type.Visit(CTypePrinter);
-            WriteLine($"typedef {typeName} {typedef};");
+            var result = typedef.Type.Visit(CTypePrinter);
+            result.Name = typedef.Name;
+            WriteLine($"typedef {result};");
 
             var newlineKind = NewLineKind.BeforeNextBlock;
 
@@ -102,57 +116,72 @@ namespace CppSharp.Generators.C
             if (!VisitDeclaration(@enum))
                 return false;
 
-            PushBlock();
+            PushBlock(BlockKind.Enum, @enum);
 
-            var useTypedefEnum = Options.GeneratorKind == GeneratorKind.C;
-            var enumName = Options.GeneratorKind != GeneratorKind.CPlusPlus ?
+            GenerateDeclarationCommon(@enum);
+
+            if (IsCLIGenerator)
+            {
+                if (@enum.Modifiers.HasFlag(Enumeration.EnumModifiers.Flags))
+                    WriteLine("[System::Flags]");
+
+                // A nested class cannot have an assembly access specifier as part
+                // of its declaration.
+                if (@enum.Namespace is Namespace)
+                    Write("public ");
+            }
+
+            var enumKind = @enum.IsScoped || IsCLIGenerator ? "enum class" : "enum";
+            var enumName = Options.GeneratorKind == GeneratorKind.C ?
                 QualifiedName(@enum) : @enum.Name;
 
-            var enumKind = @enum.IsScoped ? "enum class" : "enum";
-
-            if (useTypedefEnum)
+            var generateTypedef = Options.GeneratorKind == GeneratorKind.C;
+            if (generateTypedef)
                 Write($"typedef {enumKind} {enumName}");
             else
                 Write($"{enumKind} {enumName}");
 
-            if (Options.GeneratorKind == GeneratorKind.CPlusPlus)
+            if (Options.GeneratorKind == GeneratorKind.CPlusPlus ||
+                Options.GeneratorKind == GeneratorKind.CLI)
             {
                 var typeName = CTypePrinter.VisitPrimitiveType(
                     @enum.BuiltinType.Type, new TypeQualifiers());
 
-                if (@enum.BuiltinType.Type != PrimitiveType.Int)
+                if (@enum.BuiltinType.Type != PrimitiveType.Int &&
+                    @enum.BuiltinType.Type != PrimitiveType.Null)
                     Write($" : {typeName}");
             }
 
             NewLine();
             WriteOpenBraceAndIndent();
 
-            foreach (var item in @enum.Items)
-            {
-                if (!item.IsGenerated)
-                    continue;
+            GenerateEnumItems(@enum);
 
-                var enumItemName = Options.GeneratorKind != GeneratorKind.CPlusPlus ?
-                    $"{@enum.QualifiedName}_{item.Name}" : item.Name;
-
-                Write(enumItemName);
-
-                if (item.ExplicitValue)
-                    Write($" = {@enum.GetItemValueAsString(item)}");
-
-                if (item != @enum.Items.Last())
-                    WriteLine(",");
-            }
-
-            NewLine();
             Unindent();
 
-            if (!string.IsNullOrWhiteSpace(enumName) && useTypedefEnum)
+            if (!string.IsNullOrWhiteSpace(enumName) && generateTypedef)
                 WriteLine($"}} {enumName};");
             else
-                WriteLine($"}};");
+                WriteLine("};");
 
             PopBlock(NewLineKind.BeforeNextBlock);
+
+            return true;
+        }
+
+        public override bool VisitEnumItemDecl(Enumeration.Item item)
+        {
+            if (item.Comment != null)
+                GenerateInlineSummary(item.Comment);
+
+            var @enum = item.Namespace as Enumeration;
+            var enumItemName = Options.GeneratorKind == GeneratorKind.C ?
+                $"{@enum.QualifiedName}_{item.Name}" : item.Name;
+
+            Write(enumItemName);
+
+            if (item.ExplicitValue)
+                Write($" = {@enum.GetItemValueAsString(item)}");
 
             return true;
         }
@@ -256,7 +285,179 @@ namespace CppSharp.Generators.C
 
         public override bool VisitFieldDecl(Field field)
         {
+            CTypePrinter.PushContext(TypePrinterContextKind.Native);
+            var typeName = field.Type.Visit(CTypePrinter);
+            CTypePrinter.PopContext();
+
+            PushBlock(BlockKind.Field, field);
+
+            WriteLine($"{typeName} {field.Name};");
+
+            PopBlock(NewLineKind.BeforeNextBlock);
+
             return true;
+        }
+
+        public virtual string GetMethodIdentifier(Function function,
+            TypePrinterContextKind context = TypePrinterContextKind.Managed)
+        {
+            var method = function as Method;
+            if (method != null)
+            {
+                if (method.OperatorKind == CXXOperatorKind.Star)
+                {
+                    CTypePrinter.PushContext(TypePrinterContextKind.Native);
+                    method.ReturnType.Visit(CTypePrinter);
+                    CTypePrinter.PopContext();
+                }
+
+                if (method.OperatorKind == CXXOperatorKind.Conversion ||
+                    method.OperatorKind == CXXOperatorKind.ExplicitConversion)
+                {
+                    CTypePrinter.PushContext(context);
+                    var conversionType = method.ConversionType.Visit(CTypePrinter);
+                    CTypePrinter.PopContext();
+
+                    return "operator " + conversionType;
+                }
+
+                if (method.IsConstructor || method.IsDestructor)
+                {
+                    var @class = (Class)method.Namespace;
+                    return @class.Name;
+                }
+            }
+
+            return (context == TypePrinterContextKind.Managed) ?
+                function.Name : function.OriginalName;
+        }
+
+        public override void GenerateMethodSpecifier(Method method, Class @class)
+        {
+            var isHeaderFile = FileExtension == "h";
+            if (isHeaderFile)
+            {
+                if (method.IsVirtual || method.IsOverride)
+                    Write("virtual ");
+
+                if (method.IsStatic)
+                    Write("static ");
+
+                if (method.IsExplicit)
+                    Write("explicit ");
+            }
+
+            if (method.IsConstructor || method.IsDestructor ||
+                method.OperatorKind == CXXOperatorKind.Conversion ||
+                method.OperatorKind == CXXOperatorKind.ExplicitConversion)
+            {
+                Write($"{GetMethodIdentifier(method)}(");
+            }
+            else
+            {
+                var returnType = method.ReturnType.Visit(CTypePrinter);
+                Write($"{returnType} {GetMethodIdentifier(method)}(");
+            }
+
+            GenerateMethodParameters(method);
+
+            Write(")");
+
+            if (method.IsOverride && isHeaderFile)
+                Write(" override");
+        }
+
+        public virtual void GenerateMethodParameters(Function function)
+        {
+            Write(CTypePrinter.VisitParameters(function.Parameters)); 
+        }
+
+        public override bool VisitMethodDecl(Method method)
+        {
+            PushBlock(BlockKind.Method, method);
+
+            GenerateMethodSpecifier(method, method.Namespace as Class);
+            Write(";");
+
+            PopBlock(NewLineKind.BeforeNextBlock);
+
+            return true;
+        }
+
+        public override bool VisitProperty(Property property)
+        {
+            if (!(property.HasGetter || property.HasSetter))
+                return false;
+
+            if (property.Field != null)
+                return false;
+
+            if (property.HasGetter)
+                GeneratePropertyGetter(property.GetMethod);
+
+            if (property.HasSetter)
+                GeneratePropertySetter(property.SetMethod);
+
+            //if (Options.GenerateMSDeclspecProperties)
+                //GenerateMSDeclspecProperty(property);
+
+            return true;
+        }
+
+        public virtual void GeneratePropertyAccessorSpecifier(Method method)
+        {
+            GenerateMethodSpecifier(method, method.Namespace as Class);
+        }
+
+        public virtual void GeneratePropertyGetter(Method method)
+        {
+            PushBlock(BlockKind.Method, method);
+
+            GeneratePropertyAccessorSpecifier(method);
+            WriteLine(";");
+
+            PopBlock(NewLineKind.BeforeNextBlock);
+        }
+
+        public virtual void GeneratePropertySetter(Method method)
+        {
+            PushBlock(BlockKind.Method, method);
+
+            GeneratePropertyAccessorSpecifier(method);
+            WriteLine(";");
+
+            PopBlock(NewLineKind.BeforeNextBlock);
+        }
+
+        private void GenerateMSDeclspecProperty(Property property)
+        {
+            PushBlock(BlockKind.Property, property);
+
+            if (property.IsStatic)
+                Write("static ");
+
+            if (property.IsIndexer)
+            {
+                //GenerateIndexer(property);
+                //throw new System.NotImplementedException();
+            }
+            else
+            {
+                var blocks = new List<string>();
+
+                if (property.HasGetter)
+                    blocks.Add($"get = {property.GetMethod.Name}");
+
+                if (property.HasSetter)
+                    blocks.Add($"put = {property.SetMethod.Name}");
+
+                var getterSetter = string.Join(",", blocks);
+
+                var type = property.QualifiedType.Visit(CTypePrinter);
+                WriteLine($"__declspec(property({getterSetter})) {type} {property.Name};");
+            }
+
+            PopBlock(NewLineKind.BeforeNextBlock);
         }
 
         static readonly List<string> CReservedKeywords = new List<string> {

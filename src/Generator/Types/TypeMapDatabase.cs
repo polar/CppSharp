@@ -11,9 +11,11 @@ namespace CppSharp.Types
     public class TypeMapDatabase : ITypeMapDatabase
     {
         public IDictionary<string, TypeMap> TypeMaps { get; set; }
+        private readonly BindingContext Context;
 
         public TypeMapDatabase(BindingContext bindingContext)
         {
+            Context = bindingContext;
             TypeMaps = new Dictionary<string, TypeMap>();
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -87,12 +89,15 @@ namespace CppSharp.Types
             bool printExtra = desugared.IsPrimitiveType() ||
                 (desugared.GetFinalPointee() ?? desugared).Desugar().IsPrimitiveType();
 
-            var typePrinter = new CppTypePrinter
+            var typePrinter = new CppTypePrinter(Context)
             {
+                ResolveTypeMaps = false,
                 PrintTypeQualifiers = printExtra,
                 PrintTypeModifiers = printExtra,
                 PrintLogicalNames = true
             };
+
+            typePrinter.PushContext(TypePrinterContextKind.Native);
 
             foreach (var resolveTypeDefs in new[] { false, true })
             {
@@ -101,7 +106,8 @@ namespace CppSharp.Types
                 {
                     typePrinter.ResolveTypedefs = resolveTypeDefs;
                     typePrinter.ScopeKind = typePrintScopeKind;
-                    if (FindTypeMap(type.Visit(typePrinter), out typeMap))
+                    var typeName = type.Visit(typePrinter);
+                    if (FindTypeMap(typeName, out typeMap))
                     {
                         typeMap.Type = type;
                         typeMaps[type] = typeMap;
@@ -111,8 +117,7 @@ namespace CppSharp.Types
             }
 
             typeMap = null;
-            var typedef = type as TypedefType;
-            return typedef != null && FindTypeMap(typedef.Declaration.Type, out typeMap);
+            return false;
         }
 
         public bool FindTypeMap(Declaration declaration, out TypeMap typeMap) =>

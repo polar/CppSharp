@@ -15,6 +15,11 @@ namespace CppSharp.Passes
         /// </summary>
         private readonly HashSet<Class> interfaces = new HashSet<Class>();
 
+        /// <summary>
+        /// Change and implement secondaryy bases at the end to avoid processing implementations.
+        /// </summary>
+        private readonly HashSet<Class> classesWithSecondaryBases = new HashSet<Class>();
+
         public MultipleInheritancePass()
         {
             VisitOptions.VisitClassFields = false;
@@ -35,14 +40,32 @@ namespace CppSharp.Passes
                 int index = @interface.Namespace.Declarations.IndexOf(@interface.OriginalClass);
                 @interface.Namespace.Declarations.Insert(index, @interface);
             }
+
+            foreach (Class @class in classesWithSecondaryBases)
+            {
+                for (var i = 1; i < @class.Bases.Count; i++)
+                {
+                    var @base = @class.Bases[i];
+                    Class @interface = interfaces.FirstOrDefault(iface => iface.OriginalClass == @base.Class);
+                    if (@interface == null)
+                        continue;
+                    @class.Bases[i] = new BaseClassSpecifier(@base) { Type = new TagType(@interface) };
+                    ImplementInterfaceMethods(@class, @interface);
+                    ImplementInterfaceProperties(@class, @interface);
+                }
+            }
+
             interfaces.Clear();
+            classesWithSecondaryBases.Clear();
             return result;
         }
 
         public override bool VisitClassDecl(Class @class)
         {
-            if (!base.VisitClassDecl(@class) || !@class.IsGenerated)
+            if (!base.VisitClassDecl(@class) || !@class.IsGenerated || @class.Bases.Count == 1)
                 return false;
+
+            classesWithSecondaryBases.Add(@class);
 
             // skip the first base because we can inherit from one class
             for (var i = 1; i < @class.Bases.Count; i++)
@@ -50,11 +73,7 @@ namespace CppSharp.Passes
                 var @base = @class.Bases[i];
                 var baseClass = @base.Class;
                 if (baseClass == null || baseClass.IsInterface || !baseClass.IsGenerated) continue;
-
-                var @interface = GetInterface(baseClass);
-                @class.Bases[i] = new BaseClassSpecifier(@base) { Type = new TagType(@interface) };
-                ImplementInterfaceMethods(@class, @interface);
-                ImplementInterfaceProperties(@class, @interface);
+                GetInterface(baseClass);
             }
             return true;
         }
@@ -120,30 +139,31 @@ namespace CppSharp.Passes
             {
                 QualifiedType intPtr = new QualifiedType(
                     new BuiltinType(PrimitiveType.IntPtr));
+
                 var instance = new Property
                 {
-                        Namespace = @interface,
+                    Namespace = @interface,
+                    Name = Helpers.InstanceIdentifier,
+                    QualifiedType = intPtr,
+                    GetMethod = new Method
+                    {
                         Name = Helpers.InstanceIdentifier,
-                        QualifiedType = intPtr,
-                        GetMethod = new Method
-                        {
-                            Name = Helpers.InstanceIdentifier,
-                            SynthKind = FunctionSynthKind.InterfaceInstance,
-                            Namespace = @interface,
-                            OriginalReturnType = intPtr
-                        }
-                    };
+                        SynthKind = FunctionSynthKind.InterfaceInstance,
+                        Namespace = @interface,
+                        OriginalReturnType = intPtr
+                    }
+                };
 
                 @interface.Properties.Add(instance);
 
                 var dispose = new Method
-                    {
-                        Namespace = @interface,
-                        Name = "Dispose",
-                        ReturnType = new QualifiedType(new BuiltinType(PrimitiveType.Void)),
-                        SynthKind = FunctionSynthKind.InterfaceDispose,
-                        Mangled = string.Empty
-                    };
+                {
+                    Namespace = @interface,
+                    Name = "Dispose",
+                    ReturnType = new QualifiedType(new BuiltinType(PrimitiveType.Void)),
+                    SynthKind = FunctionSynthKind.InterfaceDispose,
+                    Mangled = string.Empty
+                };
 
                 @interface.Methods.Add(dispose);
             }
@@ -189,21 +209,23 @@ namespace CppSharp.Passes
             if (property.GetMethod != null)
             {
                 interfaceProperty.GetMethod = new Method(property.GetMethod)
-                    {
-                        OriginalFunction = property.GetMethod,
-                        Namespace = @namespace
-                    };
+                {
+                    OriginalFunction = property.GetMethod,
+                    Namespace = @namespace
+                };
             }
+
             if (property.SetMethod != null)
             {
                 // handle indexers
                 interfaceProperty.SetMethod = property.GetMethod == property.SetMethod ?
                     interfaceProperty.GetMethod : new Method(property.SetMethod)
-                        {
-                            OriginalFunction = property.SetMethod,
-                            Namespace = @namespace
-                        };
+                    {
+                        OriginalFunction = property.SetMethod,
+                        Namespace = @namespace
+                    };
             }
+
             return interfaceProperty;
         }
 
@@ -217,23 +239,29 @@ namespace CppSharp.Passes
                         m.Parameters.Where(p => !p.Ignore).SequenceEqual(
                             method.Parameters.Where(p => !p.Ignore),
                             ParameterTypeComparer.Instance));
+
                 if (existingImpl != null)
                 {
                     if (existingImpl.OriginalFunction == null)
                         existingImpl.OriginalFunction = method;
+
                     continue;
                 }
+
                 var impl = new Method(method)
-                    {
-                        Namespace = @class,
-                        OriginalNamespace = @interface,
-                        OriginalFunction = method.OriginalFunction
-                    };
+                {
+                    Namespace = @class,
+                    OriginalNamespace = @interface,
+                    OriginalFunction = method.OriginalFunction
+                };
+
                 var rootBaseMethod = @class.GetBaseMethod(method);
                 if (rootBaseMethod != null && rootBaseMethod.IsDeclared)
                     impl.ExplicitInterfaceImpl = @interface;
+
                 @class.Methods.Add(impl);
             }
+
             foreach (var @base in @interface.Bases)
                 ImplementInterfaceMethods(@class, @base.Class);
         }
@@ -244,11 +272,14 @@ namespace CppSharp.Passes
             {
                 var impl = CreateInterfaceProperty(property, @class);
                 impl.OriginalNamespace = @interface;
+
                 var rootBaseProperty = @class.GetBasePropertyByName(property, true);
                 if (rootBaseProperty != null && rootBaseProperty.IsDeclared)
                     impl.ExplicitInterfaceImpl = @interface;
+
                 @class.Properties.Add(impl);
             }
+
             foreach (var @base in @interface.Bases)
                 ImplementInterfaceProperties(@class, @base.Class);
         }

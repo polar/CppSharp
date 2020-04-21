@@ -84,6 +84,7 @@ public:
     bool isDependent;
     bool isImplicit;
     bool isInvalid;
+    bool isDeprecated;
     Declaration* completeDeclaration;
     unsigned definitionOrder;
     VECTOR(PreprocessedEntity*, PreprocessedEntities)
@@ -662,7 +663,7 @@ public:
     ClassTemplate();
     ~ClassTemplate();
     VECTOR(ClassTemplateSpecialization*, Specializations)
-        ClassTemplateSpecialization* FindSpecialization(const std::string& usr);
+    ClassTemplateSpecialization* FindSpecialization(const std::string& usr);
     ClassTemplatePartialSpecialization* FindPartialSpecialization(const std::string& usr);
 };
 

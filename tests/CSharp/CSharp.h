@@ -32,6 +32,7 @@ public:
     int width();
     void set_width(int value);
     const int& returnConstRef();
+    AbstractTemplate<int>* getAbstractTemplate();
 
     static const int rename = 5;
     static int makeFunctionCall();
@@ -580,6 +581,20 @@ struct DLL_API MI_C : public MI_A0, public MI_B
 
 MI_C::MI_C() {}
 
+struct DLL_API MI_A1
+{
+    MI_A1();
+};
+
+MI_A1::MI_A1() {}
+
+struct DLL_API MI_D : public MI_A1, public MI_C
+{
+    MI_D();
+};
+
+MI_D::MI_D() {}
+
 class DLL_API StructWithPrivateFields
 {
 public:
@@ -835,12 +850,17 @@ public:
 };
 
 template <typename T>
-class TemplateWithDependentField
+class DLL_API TemplateWithDependentField
 {
 public:
     TemplateWithDependentField();
     T t;
 };
+
+template <typename T>
+TemplateWithDependentField<T>::TemplateWithDependentField()
+{
+}
 
 class DerivesFromTemplateInstantiation : public TemplateWithDependentField<int>
 {
@@ -1342,6 +1362,7 @@ public:
 
 DLL_API void va_listFunction(va_list v);
 DLL_API char* returnCharPointer();
+DLL_API char* takeCharPointer(char* c);
 DLL_API char* takeConstCharRef(const char& c);
 DLL_API const char*& takeConstCharStarRef(const char*& c);
 DLL_API const void*& rValueReferenceToPointer(void*&& v);

@@ -78,6 +78,7 @@ namespace CppSharp.Passes
                         m.OriginalFunction != null) &&
                     m.SynthKind != FunctionSynthKind.DefaultValueOverload &&
                     m.SynthKind != FunctionSynthKind.ComplementOperator &&
+                    m.SynthKind != FunctionSynthKind.FieldAcessor &&
                     !m.ExcludeFromPasses.Contains(typeof(GetterSetterToPropertyPass))))
             {
                 if (IsGetter(method))
@@ -114,7 +115,7 @@ namespace CppSharp.Passes
                     Match(firstWord, new[] { "get", "is", "has" }))
                     continue;
 
-                if (Match(firstWord, new[] { "to", "new" }) ||
+                if (Match(firstWord, new[] { "to", "new", "on" }) ||
                     verbs.Contains(firstWord))
                 {
                     property.GetMethod.GenerationKind = GenerationKind.Generate;
@@ -144,6 +145,8 @@ namespace CppSharp.Passes
 
             if (property == null)
                 properties.Add(property = new Property { Name = name, QualifiedType = type });
+
+            method.AssociatedDeclaration = property;
 
             if (isSetter)
                 property.SetMethod = method;
@@ -303,7 +306,8 @@ namespace CppSharp.Passes
         private static string GetPropertyName(string name)
         {
             var firstWord = GetFirstWord(name);
-            if (Match(firstWord, new[] { "get" }) && name != firstWord &&
+            if (Match(firstWord, new[] { "get" }) &&
+                (string.Compare(name, firstWord, StringComparison.InvariantCultureIgnoreCase) != 0) &&
                 !char.IsNumber(name[3]))
             {
                 if (char.IsLower(name[0]))

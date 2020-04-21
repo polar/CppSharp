@@ -342,18 +342,10 @@ void Parser::Setup()
     clang::driver::ToolChain *TC = nullptr;
     llvm::Triple Target(TO->Triple);
 
-    switch (Target.getOS()) {
-    case llvm::Triple::Linux:
-      TC = new clang::driver::toolchains::Linux(D, Target, Args);
-      break;
-    case llvm::Triple::Win32:
-        switch (Target.getEnvironment()) {
-        case llvm::Triple::MSVC:
-            TC = new clang::driver::toolchains::MSVCToolChain(D, Target, Args);
-            break;
-        }
-        break;
-    }
+    if (Target.getOS() == llvm::Triple::Linux)
+        TC = new clang::driver::toolchains::Linux(D, Target, Args);
+    else if (Target.getEnvironment() == llvm::Triple::EnvironmentType::MSVC)
+        TC = new clang::driver::toolchains::MSVCToolChain(D, Target, Args);
 
     if (TC && !opts->noStandardIncludes) {
         llvm::opt::ArgStringList Includes;
@@ -365,6 +357,9 @@ void Parser::Setup()
                     /*IgnoreSysRoot=*/false);
         }
     }
+
+    if (TC)
+        delete TC;
 
     // Enable preprocessing record.
     PPOpts.DetailedRecord = true;
@@ -924,12 +919,12 @@ static RecordArgABI GetRecordArgABI(
     using namespace clang::CodeGen;
     switch (argAbi)
     {
-    case CGCXXABI::RecordArgABI::RAA_Default:
-        return RecordArgABI::Default;
     case CGCXXABI::RecordArgABI::RAA_DirectInMemory:
         return RecordArgABI::DirectInMemory;
     case CGCXXABI::RecordArgABI::RAA_Indirect:
         return RecordArgABI::Indirect;
+    default:
+        return RecordArgABI::Default;
     }
 }
 
@@ -1004,6 +999,8 @@ void Parser::WalkRecord(const clang::RecordDecl* Record, Class* RC)
                         WalkDeclaration(MD);
                     break;
                 }
+                default:
+                    break;
                 }
             }
         }
@@ -1773,9 +1770,14 @@ static CXXOperatorKind GetOperatorKindFromDecl(clang::DeclarationName Name)
 
 Method* Parser::WalkMethodCXX(const clang::CXXMethodDecl* MD)
 {
+    const clang::CXXConstructorDecl* Ctor;
     if (opts->skipPrivateDeclarations &&
         MD->getAccess() == clang::AccessSpecifier::AS_private &&
-        !MD->isVirtual())
+        !MD->isVirtual() &&
+        !MD->isCopyAssignmentOperator() &&
+        !MD->isMoveAssignmentOperator() &&
+        (!(Ctor = llvm::dyn_cast<clang::CXXConstructorDecl>(MD)) ||
+         (!Ctor->isDefaultConstructor() && !Ctor->isCopyOrMoveConstructor())))
         return nullptr;
 
     using namespace clang;
@@ -2991,13 +2993,22 @@ void Parser::CompleteIfSpecializationType(const clang::QualType& QualType)
 
     auto existingClient = c->getSema().getDiagnostics().getClient();
     std::unique_ptr<::DiagnosticConsumer> SemaDiagnostics(new ::DiagnosticConsumer());
-    SemaDiagnostics-> Decl = CTS;
+    SemaDiagnostics->Decl = CTS;
     c->getSema().getDiagnostics().setClient(SemaDiagnostics.get(), false);
 
     c->getSema().InstantiateClassTemplateSpecialization(CTS->getBeginLoc(),
         CTS, TSK_ImplicitInstantiation, false);
 
     c->getSema().getDiagnostics().setClient(existingClient, false);
+
+    auto CT = WalkClassTemplate(CTS->getSpecializedTemplate());
+    auto USR = GetDeclUSR(CTS);
+    auto TS = CT->FindSpecialization(USR);
+    if (TS != nullptr && TS->isIncomplete)
+    {
+        TS->isIncomplete = false;
+        WalkRecordCXX(CTS, TS);
+    }
 }
 
 Parameter* Parser::WalkParameter(const clang::ParmVarDecl* PVD,
@@ -3076,6 +3087,8 @@ static bool IsInvalid(clang::Stmt* Body, std::unordered_set<clang::Stmt*>& Bodie
     case clang::Stmt::StmtClass::MemberExprClass:
         D = cast<clang::MemberExpr>(Body)->getMemberDecl();
         break;
+    default:
+        break;
     }
     if (D)
     {
@@ -3120,9 +3133,7 @@ void Parser::MarkValidity(Function* F)
 
     auto FD = static_cast<FunctionDecl*>(F->originalPtr);
 
-    if (!FD->getTemplateInstantiationPattern() ||
-        !FD->isExternallyVisible() ||
-        c->getSourceManager().isInSystemHeader(FD->getBeginLoc()))
+    if (!FD->getTemplateInstantiationPattern() || !FD->isExternallyVisible())
         return;
 
     auto existingClient = c->getSema().getDiagnostics().getClient();
@@ -3269,20 +3280,17 @@ void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
     if (auto FTSI = FD->getTemplateSpecializationInfo())
         F->specializationInfo = WalkFunctionTemplateSpec(FTSI, F);
 
-    if (FD->isDependentContext())
-        return;
-
     const CXXMethodDecl* MD;
-    if ((MD = dyn_cast<CXXMethodDecl>(FD)) && !MD->isStatic() &&
-        !HasLayout(cast<CXXRecordDecl>(MD->getDeclContext())))
+    if (FD->isDependentContext() ||
+        ((MD = dyn_cast<CXXMethodDecl>(FD)) && !MD->isStatic() &&
+         !HasLayout(cast<CXXRecordDecl>(MD->getDeclContext()))) ||
+        !CanCheckCodeGenInfo(c->getSema(), FD->getReturnType().getTypePtr()) ||
+        std::any_of(FD->parameters().begin(), FD->parameters().end(),
+            [this](auto* P) { return !CanCheckCodeGenInfo(c->getSema(), P->getType().getTypePtr()); }))
+    {
+        F->qualifiedType = GetQualifiedType(FD->getType(), &FTL);
         return;
-
-    if (!CanCheckCodeGenInfo(c->getSema(), FD->getReturnType().getTypePtr()))
-        return;
-
-    for (const auto& P : FD->parameters())
-        if (!CanCheckCodeGenInfo(c->getSema(), P->getType().getTypePtr()))
-            return;
+    }
 
     auto& CGInfo = GetCodeGenFunctionInfo(codeGenTypes, FD);
     F->isReturnIndirect = CGInfo.getReturnInfo().isIndirect() ||
@@ -3296,6 +3304,7 @@ void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
     }
 
     MarkValidity(F);
+    F->qualifiedType = GetQualifiedType(FD->getType(), &FTL);
 }
 
 Function* Parser::WalkFunction(const clang::FunctionDecl* FD, bool IsDependent,
@@ -3500,7 +3509,7 @@ PreprocessedEntity* Parser::WalkPreprocessedEntity(
 
         MacroInfo* MI = P.getMacroInfo((IdentifierInfo*)II);
 
-        if (!MI || MI->isBuiltinMacro() || MI->isFunctionLike())
+        if (!MI || MI->isBuiltinMacro())
             break;
 
         clang::SourceManager& SM = c->getSourceManager();
@@ -4076,10 +4085,22 @@ Declaration* Parser::WalkDeclaration(const clang::Decl* D)
         for (auto it = D->attr_begin(); it != D->attr_end(); ++it)
         {
             Attr* Attr = (*it);
-            if (Attr->getKind() == clang::attr::Kind::MaxFieldAlignment)
+            switch(Attr->getKind())
             {
-                auto MFA = cast<clang::MaxFieldAlignmentAttr>(Attr);
-                Decl->maxFieldAlignment = MFA->getAlignment() / 8; // bits to bytes.
+                case clang::attr::Kind::MaxFieldAlignment:
+                {
+                    auto MFA = cast<clang::MaxFieldAlignmentAttr>(Attr);
+                    Decl->maxFieldAlignment = MFA->getAlignment() / 8; // bits to bytes.
+                    break;
+                }
+                case clang::attr::Kind::Deprecated:
+                {
+                    auto DA = cast<clang::DeprecatedAttr>(Attr);
+                    Decl->isDeprecated = true;
+                    break;
+                }
+                default:
+                    break;
             }
         }
     }
@@ -4389,17 +4410,12 @@ ParserResultKind Parser::ParseSharedLib(llvm::StringRef File,
         // see https://bugs.llvm.org/show_bug.cgi?id=44433
         for (const auto& Symbol : MachOObjectFile->symbols())
         {
-            if (Symbol.getName())
-            {
-                if ((Symbol.getFlags() & llvm::object::BasicSymbolRef::Flags::SF_Exported) &&
-                    !(Symbol.getFlags() & llvm::object::BasicSymbolRef::Flags::SF_Undefined))
-                    NativeLib->Symbols.push_back(Symbol.getName().get().str());
-            }
-            else
-            {
-                Symbol.getName().takeError();
+            if (Symbol.getName().takeError())
                 return ParserResultKind::Error;
-            }
+
+            if ((Symbol.getFlags() & llvm::object::BasicSymbolRef::Flags::SF_Exported) &&
+                !(Symbol.getFlags() & llvm::object::BasicSymbolRef::Flags::SF_Undefined))
+                NativeLib->Symbols.push_back(Symbol.getName().get().str());
         }
         return ParserResultKind::Success;
     }

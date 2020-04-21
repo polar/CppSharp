@@ -85,6 +85,13 @@ namespace CppSharp.Passes
                 return true;
             }
 
+            if (decl.IsDeprecated && !Options.GenerateDeprecatedDeclarations)
+            {
+                Diagnostics.Debug("Decl '{0}' was ignored due to being deprecated", decl.Name);
+                decl.ExplicitlyIgnore();
+                return true;
+            }
+
             if (!CheckDeclarationAccess(decl))
             {
                 Diagnostics.Debug("Decl '{0}' was ignored due to invalid access",
@@ -100,7 +107,7 @@ namespace CppSharp.Passes
             if (!VisitDeclaration(field))
                 return false;
 
-            var type = (field.Type.GetFinalPointee() ?? field.Type).Desugar();
+            var type = (field.Type.Desugar().GetFinalPointee() ?? field.Type).Desugar();
 
             Declaration decl;
             type.TryGetDeclaration(out decl);
@@ -116,7 +123,7 @@ namespace CppSharp.Passes
 
             var @class = (Class)field.Namespace;
 
-            var cppTypePrinter = new CppTypePrinter();
+            var cppTypePrinter = new CppTypePrinter(Context);
             var typeName = field.Type.Visit(cppTypePrinter);
 
             Diagnostics.Debug("Field '{0}::{1}' was ignored due to {2} type '{3}'",

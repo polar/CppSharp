@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using CppSharp.AST;
 using CppSharp.Generators.C;
@@ -10,37 +9,16 @@ namespace CppSharp.Generators.CLI
     /// for source (CLISources) and header (CLIHeaders)
     /// files.
     /// </summary>
-    public abstract class CLITemplate : CodeGenerator
+    public abstract class CLITemplate : CCodeGenerator
     {
-        public CLITypePrinter TypePrinter { get; set; }
-
-        public ISet<CInclude> Includes;
-
         protected CLITemplate(BindingContext context, IEnumerable<TranslationUnit> units)
-            : base(context, units)
-        {
-            TypePrinter = new CLITypePrinter(context);
-            Includes = new HashSet<CInclude>();
-        }
+            : base(context, units) => typePrinter = new CLITypePrinter(context);
 
         public abstract override string FileExtension { get; }
 
         public abstract override void Process();
 
         #region Helpers
-
-        public string QualifiedIdentifier(Declaration decl)
-        {
-            if (!string.IsNullOrEmpty(TranslationUnit.Module.OutputNamespace))
-            {
-                if (string.IsNullOrEmpty(decl.QualifiedName))
-                    return $"{decl.TranslationUnit.Module.OutputNamespace}";
-
-                return $"{decl.TranslationUnit.Module.OutputNamespace}::{decl.QualifiedName}";
-            }
-                
-            return decl.QualifiedName;
-        }
 
         public string GetMethodName(Method method)
         {
@@ -66,7 +44,7 @@ namespace CppSharp.Generators.CLI
                     continue;
 
                 var param = method.Parameters[i];
-                Write("{0}", TypePrinter.VisitParameter(param));
+                Write("{0}", CTypePrinter.VisitParameter(param));
                 if (i < method.Parameters.Count - 1)
                     Write(", ");
             }
@@ -76,7 +54,7 @@ namespace CppSharp.Generators.CLI
         {
             var types = new List<string>();
             foreach (var param in parameters)
-                types.Add(TypePrinter.VisitParameter(param).ToString());
+                types.Add(CTypePrinter.VisitParameter(param).ToString());
             return string.Join(", ", types);
         }
 

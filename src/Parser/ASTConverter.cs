@@ -985,6 +985,7 @@ namespace CppSharp
             _decl.IsInvalid = decl.IsInvalid;
             _decl.DefinitionOrder = decl.DefinitionOrder;
             _decl.MaxFieldAlignment = decl.MaxFieldAlignment;
+            _decl.IsDeprecated = decl.IsDeprecated;
 
             if (decl.CompleteDeclaration != null)
                 _decl.CompleteDeclaration = Visit(decl.CompleteDeclaration);
@@ -1587,7 +1588,15 @@ namespace CppSharp
             _class.IsInjected = @class.IsInjected;
 
             if (@class.Layout != null)
+            {
                 _class.Layout = VisitClassLayout(@class.Layout);
+                if (_class.BaseClass != null)
+                {
+                    AST.LayoutBase @base = _class.Layout.Bases.Find(
+                        b => b.Class == _class.BaseClass);
+                    _class.BaseClass.Layout.HasSubclassAtNonZeroOffset = @base.Offset > 0;
+                }
+            }
         }
 
         public override AST.Declaration VisitClass(Class @class)
@@ -2164,6 +2173,24 @@ namespace CppSharp
             var inlineCommandComment = new AST.InlineCommandComment();
             inlineCommandComment.HasTrailingNewline = comment.HasTrailingNewline;
             inlineCommandComment.CommandId = comment.CommandId;
+            switch (comment.CommentRenderKind)
+            {
+                case InlineCommandComment.RenderKind.RenderNormal:
+                    inlineCommandComment.CommentRenderKind = AST.InlineCommandComment.RenderKind.RenderNormal;
+                    break;
+                case InlineCommandComment.RenderKind.RenderBold:
+                    inlineCommandComment.CommentRenderKind = AST.InlineCommandComment.RenderKind.RenderBold;
+                    break;
+                case InlineCommandComment.RenderKind.RenderMonospaced:
+                    inlineCommandComment.CommentRenderKind = AST.InlineCommandComment.RenderKind.RenderMonospaced;
+                    break;
+                case InlineCommandComment.RenderKind.RenderEmphasized:
+                    inlineCommandComment.CommentRenderKind = AST.InlineCommandComment.RenderKind.RenderEmphasized;
+                    break;
+                case InlineCommandComment.RenderKind.RenderAnchor:
+                    inlineCommandComment.CommentRenderKind = AST.InlineCommandComment.RenderKind.RenderAnchor;
+                    break;
+            }
             for (uint i = 0; i < comment.ArgumentsCount; i++)
             {
                 var argument = new AST.InlineCommandComment.Argument { Text = comment.GetArguments(i).Text };

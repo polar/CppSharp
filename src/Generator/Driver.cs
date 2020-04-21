@@ -13,6 +13,7 @@ using CppSharp.Passes;
 using CppSharp.Utils;
 using Microsoft.CSharp;
 using CppSharp.Types;
+using CppSharp.Generators.Cpp;
 
 namespace CppSharp
 {
@@ -35,13 +36,15 @@ namespace CppSharp
         {
             switch (kind)
             {
+                case GeneratorKind.CPlusPlus:
+                    return new CppGenerator(Context);
                 case GeneratorKind.CLI:
                     return new CLIGenerator(Context);
                 case GeneratorKind.CSharp:
                     return new CSharpGenerator(Context);
             }
 
-            return null;
+            throw new NotImplementedException();
         }
 
         void ValidateOptions()
@@ -219,8 +222,10 @@ namespace CppSharp
 
             TranslationUnitPasses.AddPass(new ResolveIncompleteDeclsPass());
             TranslationUnitPasses.AddPass(new IgnoreSystemDeclarationsPass());
+
             if (Options.IsCSharpGenerator)
                 TranslationUnitPasses.AddPass(new EqualiseAccessOfOverrideAndBasePass());
+
             TranslationUnitPasses.AddPass(new CheckIgnoredDeclsPass());
 
             if (Options.IsCSharpGenerator)
@@ -236,11 +241,21 @@ namespace CppSharp
             TranslationUnitPasses.AddPass(new FindSymbolsPass());
             TranslationUnitPasses.AddPass(new CheckMacroPass());
             TranslationUnitPasses.AddPass(new CheckStaticClass());
-            TranslationUnitPasses.AddPass(new MoveFunctionToClassPass());
+
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new MoveFunctionToClassPass());
+            }
+
             TranslationUnitPasses.AddPass(new CheckAmbiguousFunctions());
             TranslationUnitPasses.AddPass(new ConstructorToConversionOperatorPass());
             TranslationUnitPasses.AddPass(new MarshalPrimitivePointersAsRefTypePass());
-            TranslationUnitPasses.AddPass(new CheckOperatorsOverloadsPass());
+
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new CheckOperatorsOverloadsPass());
+            }
+
             TranslationUnitPasses.AddPass(new CheckVirtualOverrideReturnCovariance());
             TranslationUnitPasses.AddPass(new CleanCommentsPass());
 
@@ -258,7 +273,11 @@ namespace CppSharp
                 TranslationUnitPasses.AddPass(new GenerateAbstractImplementationsPass());
                 TranslationUnitPasses.AddPass(new MultipleInheritancePass());
             }
-            TranslationUnitPasses.AddPass(new DelegatesPass());
+
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new DelegatesPass());
+            }
 
             TranslationUnitPasses.AddPass(new GetterSetterToPropertyPass());
             TranslationUnitPasses.AddPass(new StripUnusedSystemTypesPass());
@@ -268,12 +287,12 @@ namespace CppSharp
                 TranslationUnitPasses.AddPass(new SpecializationMethodsWithDependentPointersPass());
                 TranslationUnitPasses.AddPass(new ParamTypeToInterfacePass());
             }
+
             TranslationUnitPasses.AddPass(new CheckDuplicatedNamesPass());
 
             TranslationUnitPasses.AddPass(new MarkUsedClassInternalsPass());
 
-            if (Options.GeneratorKind == GeneratorKind.CLI ||
-                Options.GeneratorKind == GeneratorKind.CSharp)
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
             {
                 TranslationUnitPasses.RenameDeclsUpperCase(RenameTargets.Any & ~RenameTargets.Parameter);
                 TranslationUnitPasses.AddPass(new CheckKeywordNamesPass());
@@ -314,7 +333,7 @@ namespace CppSharp
 
                 foreach (var template in output.Outputs)
                 {
-                    var fileRelativePath = string.Format("{0}.{1}", fileBase, template.FileExtension);
+                    var fileRelativePath = $"{fileBase}.{template.FileExtension}";
 
                     var file = Path.Combine(outputPath, fileRelativePath);
                     File.WriteAllText(file, template.Generate());
