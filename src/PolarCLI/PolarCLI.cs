@@ -27,7 +27,9 @@ namespace CppSharp
 
             optionSet.Add("o=|output=", "the {PATH} for the generated bindings file (doesn't need the extension since it will depend on the generator)", v => HandleOutputArg(v, errorMessages) );
             optionSet.Add("on=|outputnamespace=", "the {NAMESPACE} that will be used for the generated code", on => driver.setOutputNamespace(on) );
-            
+            optionSet.Add("p=|platform=", "the {PLATFORM} that the generated code will target: 'win', 'osx' or 'linux'", p => { GetDestinationPlatform(p, errorMessages); } );
+            optionSet.Add("a=|arch=", "the {ARCHITECTURE} that the generated code will target: 'x86' or 'x64'", a => { GetDestinationArchitecture(a, errorMessages); } );
+
             optionSet.Add("h|help", "shows the help", hl => { showHelp = (hl != null); });
 
             List<string> additionalArguments = null;
@@ -98,11 +100,13 @@ namespace CppSharp
         {
             try
             {
-                string file = Path.GetFileNameWithoutExtension(arg);
+                string file = Path.GetFullPath(arg);
+                Console.WriteLine("Setting Output Directory: " + file);
                 driver.setOutputDirectory(file);
             }
             catch(Exception e)
             {
+                Console.WriteLine("Exception : " + e.Message);
                 driver.setOutputDirectory(".");
             }
         }
@@ -203,6 +207,16 @@ namespace CppSharp
             {
                 errorMessages.Add(string.Format("Error while looking for files inside path '{0}'. Ignoring.", path));
             }
+        }
+
+        static void GetDestinationPlatform(string platform, List<string> errorMessages)
+        {
+            driver.SetPlatform(platform.ToLower());
+        }
+
+        static void GetDestinationArchitecture(string architecture, List<string> errorMessages)
+        {
+            driver.SetArchitecture(architecture.ToLower()); 
         }
 
         static void PrintErrorMessages(List<string> errorMessages)
