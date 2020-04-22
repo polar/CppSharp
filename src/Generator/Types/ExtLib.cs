@@ -45,6 +45,18 @@ namespace CppSharp.Types.Ext
         {
             get { return true; }
         }
+        
+        public override Type CppSignatureType(TypePrinterContext ctx)
+        {
+            // TODO: Research why this is wrong.
+            // This screws up if the operator= method is left undefined and the
+            // system generates a symbol for operator=.
+            // It ends up being:
+            //   Interop::StringOptional (Interop::StringOptional::*_0)(Interop::StringOptional) = &Interop::StringOptional::operator=;
+            // in which it should be:
+            //   Interop::StringOptional& (Interop::StringOptional::*_0)(Interop::StringOptional&&) = &Interop::StringOptional::operator=;
+            return new CustomType("Interop::StringOptional");
+        }
 
         public override Type CSharpSignatureType(TypePrinterContext ctx)
         {
