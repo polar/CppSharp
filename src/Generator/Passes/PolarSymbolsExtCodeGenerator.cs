@@ -18,6 +18,10 @@ namespace CppSharp.Passes
         public PolarSymbolsExtCodeGenerator(BindingContext context, IEnumerable<TranslationUnit> units)
             : base(context, units)
         {
+            cppTypePrinter = new CppTypePrinter(context)
+            {
+                ScopeKind = TypePrintScopeKind.Qualified
+            };
         }
 
         public override void Process()
@@ -384,10 +388,7 @@ System.Console.WriteLine($"VisitClassTemplateSpeciationDecl: {specialization.Vis
             return parentsOpen;
         }
 
-        private CppTypePrinter cppTypePrinter = new CppTypePrinter
-        {
-            ScopeKind = TypePrintScopeKind.Qualified
-        };
+        private CppTypePrinter cppTypePrinter;
         private int functionCount;
     }
 }
