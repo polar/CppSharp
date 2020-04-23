@@ -30,9 +30,7 @@ namespace CppSharp.Passes
             WriteLine("#define _LIBCPP_HIDE_FROM_ABI");
             NewLine();
             WriteLine("#include \"{0}\"", ((PolarDriverOptions)Context.Options).VectorHolderPath);
-// TODO:: Add argument for Optional!
             WriteLine("#include \"{0}\"", ((PolarDriverOptions)Context.Options).OptionalPath);
-            ///WriteLine("#include \"/home/polar/RiderProjects/ALK.Interop/ALK.Interop/CppAPI/Interop/Tuple3Holder.hpp\"");
             foreach (var module in Options.Modules)
             {
                 if (module != Options.SystemModule && module.LibraryName != "Ext")
