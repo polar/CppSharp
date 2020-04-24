@@ -417,7 +417,8 @@ namespace CppSharp.Types.Std
             {
                 if (!usePointer)
                 {
-                    string @string2 = $"(((int) {ctx.ReturnVarName}._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_dataplus._M_p, (int) {ctx.ReturnVarName}._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_local_buf, (int) {ctx.ReturnVarName}._M_string_length))";
+                    string @string2 = $"global::ALK.Interop.Utils.toString({ctx.ReturnVarName})";
+                    //string @string2 = $"(((int) {ctx.ReturnVarName}._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_dataplus._M_p, (int) {ctx.ReturnVarName}._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_local_buf, (int) {ctx.ReturnVarName}._M_string_length))";
 
                     ctx.Return.Write(@string2);
                 }
