@@ -547,9 +547,9 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             var listName = $"__list{ctx.ParameterIndex}";
             if (Platform.IsWindows)
                 if (insideTypeName == "bool")
-            	    ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._Mypair._Myval2;");
-                else
                     ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._Myvec;");
+                else
+                    ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._Mypair._Myval2;");
             else
             	ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._M_impl;");
             var itemSizeName = $"__itemSize{ctx.ParameterIndex}";
