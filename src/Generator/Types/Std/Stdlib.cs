@@ -413,7 +413,7 @@ namespace CppSharp.Types.Std
                 ctx.MarshalKind == MarshalKind.ReturnVariableArray;
             System.Console.WriteLine(
                 $"UsePointer={usePointer} type {type}, MarshalKind {ctx.MarshalKind} ReturnVarName = {ctx.ReturnVarName}");
-            if (Context.PolarFixesEnabled)
+            if (Context.PolarFixesEnabled && !Platform.IsWindows)
             {
                 if (!usePointer)
                 {
