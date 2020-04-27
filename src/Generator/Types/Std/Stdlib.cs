@@ -423,7 +423,7 @@ namespace CppSharp.Types.Std
 					if (!Platform.IsWindows)
                     	returnValue = $"(((int) {ctx.ReturnVarName}._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_dataplus._M_p, (int) {ctx.ReturnVarName}._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_local_buf, (int) {ctx.ReturnVarName}._M_string_length))";
 					else
-                    	returnValue = $"(((int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Ptr, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize)  : global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Buf, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize)) ";
+                    	returnValue = $"(((int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Ptr, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize) : global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Buf, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize))";
 
                     ctx.Return.Write(returnValue);
                 }
