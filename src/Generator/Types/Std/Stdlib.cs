@@ -413,7 +413,7 @@ namespace CppSharp.Types.Std
                 ctx.MarshalKind == MarshalKind.ReturnVariableArray;
             System.Console.WriteLine(
                 $"UsePointer={usePointer} type {type}, MarshalKind {ctx.MarshalKind} ReturnVarName = {ctx.ReturnVarName}");
-            if (Context.PolarFixesEnabled && !Platform.IsWindows)
+            if (Context.PolarFixesEnabled)
             {
                 if (!usePointer)
                 {
@@ -460,8 +460,6 @@ namespace CppSharp.Types.Std
                         (usePointer ? string.Empty : $"new {typePrinter.IntPtrType}(&")}{
                         ctx.ReturnVarName}{(usePointer ? string.Empty : ")")});");
                 string @string = $"{qualifiedBasicString}Extensions.{data.Name}({varBasicString})";
-                if (Context.PolarFixesEnabled)
-                   @string = $"new System.String({@string})";
                 if (usePointer)
                 {
                     ctx.Return.Write(@string);
