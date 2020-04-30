@@ -434,6 +434,14 @@ namespace CppSharp.Types.Std
                     var typePrinter = new CSharpTypePrinter(ctx.Context);
                     string qualifiedBasicString = GetQualifiedBasicString(basicString);
                     string varBasicString = $"__basicStringRet{ctx.ParameterIndex}";
+                    string returnVarName= $"(*(({basicString.Visit(typePrinter)}.__Internal*) {ctx.ReturnVarName}));
+                    
+                    ctx.Before.WriteLine($@"var {varBasicString}YY = {returnVarName};");
+                    if (!Platform.IsWindows)
+                       returnValue = $"(((int) {varBasicString}YY._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){varBasicString}YY._M_dataplus._M_p, (int) {varBasicString}YY._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){varBasicString}YY._M_local_buf, (int) {varBasicString}YY._M_string_length))";
+				    else
+                       returnValue = $"(((int) {varBasicString}YY._Mypair._Myval2._Mysize) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*) {varBasicString}YY._Mypair._Myval2._Bx._Ptr, (int) {varBasicString}YY._Mypair._Myval2._Mysize) : global::System.Text.Encoding.UTF8.GetString((byte*) {varBasicString}YY._Mypair._Myval2._Bx._Buf, (int) {varBasicString}YY._Mypair._Myval2._Mysize))";
+
                     ctx.Before.WriteLine($@"var {varBasicString}XX = {returnValue};");
                     ctx.Before.WriteLine($@"var {varBasicString} = {
                             basicString.Visit(typePrinter)}.{Helpers.CreateInstanceIdentifier}({
