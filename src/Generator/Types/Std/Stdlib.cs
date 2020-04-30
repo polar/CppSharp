@@ -434,7 +434,7 @@ namespace CppSharp.Types.Std
                     var typePrinter = new CSharpTypePrinter(ctx.Context);
                     string qualifiedBasicString = GetQualifiedBasicString(basicString);
                     string varBasicString = $"__basicStringRet{ctx.ParameterIndex}";
-                    ctx.Before.WriteLine($@"var {varBasicString}XX = {returnValue});");
+                    ctx.Before.WriteLine($@"var {varBasicString}XX = {returnValue};");
                     ctx.Before.WriteLine($@"var {varBasicString} = {
                             basicString.Visit(typePrinter)}.{Helpers.CreateInstanceIdentifier}({
                             (usePointer ? string.Empty : $"new {typePrinter.IntPtrType}(&")}{
