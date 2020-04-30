@@ -415,16 +415,16 @@ namespace CppSharp.Types.Std
                 $"UsePointer={usePointer} type {type}, MarshalKind {ctx.MarshalKind} ReturnVarName = {ctx.ReturnVarName}");
             if (Context.PolarFixesEnabled)
             {
-				// Cannot call a function, because that shifts the calling context. We must decide here.
-                //string @string2 = $"global::ALK.Interop.Utils.toString({ctx.ReturnVarName})";
-                string returnValue;
-				if (!Platform.IsWindows)
-                    returnValue = $"(((int) {ctx.ReturnVarName}._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_dataplus._M_p, (int) {ctx.ReturnVarName}._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_local_buf, (int) {ctx.ReturnVarName}._M_string_length))";
-				else
-                    returnValue = $"(((int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Ptr, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize) : global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Buf, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize))";
-
                 if (!usePointer)
-                {      
+                {
+					// Cannot call a function, because that shifts the calling context. We must decide here.
+                	//string @string2 = $"global::ALK.Interop.Utils.toString({ctx.ReturnVarName})";
+           		    string returnValue;
+					if (!Platform.IsWindows)
+                    	returnValue = $"(((int) {ctx.ReturnVarName}._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_dataplus._M_p, (int) {ctx.ReturnVarName}._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){ctx.ReturnVarName}._M_local_buf, (int) {ctx.ReturnVarName}._M_string_length))";
+					else
+                    	returnValue = $"(((int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Ptr, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize) : global::System.Text.Encoding.UTF8.GetString((byte*) {ctx.ReturnVarName}._Mypair._Myval2._Bx._Buf, (int) {ctx.ReturnVarName}._Mypair._Myval2._Mysize))";
+
                     ctx.Return.Write(returnValue);
                 }
                 else
@@ -434,15 +434,6 @@ namespace CppSharp.Types.Std
                     var typePrinter = new CSharpTypePrinter(ctx.Context);
                     string qualifiedBasicString = GetQualifiedBasicString(basicString);
                     string varBasicString = $"__basicStringRet{ctx.ParameterIndex}";
-                    string returnVarName= $"(*(({basicString.Visit(typePrinter)}.__Internal*) {ctx.ReturnVarName}))";
-                    
-                    ctx.Before.WriteLine($@"var {varBasicString}YY = {returnVarName};");
-                    if (!Platform.IsWindows)
-                       returnValue = $"(((int) {varBasicString}YY._M_string_length) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*){varBasicString}YY._M_dataplus._M_p, (int) {varBasicString}YY._M_string_length) : global::System.Text.Encoding.UTF8.GetString((byte*){varBasicString}YY._M_local_buf, (int) {varBasicString}YY._M_string_length))";
-				    else
-                       returnValue = $"(((int) {varBasicString}YY._Mypair._Myval2._Mysize) > 15 ? global::System.Text.Encoding.UTF8.GetString((byte*) {varBasicString}YY._Mypair._Myval2._Bx._Ptr, (int) {varBasicString}YY._Mypair._Myval2._Mysize) : global::System.Text.Encoding.UTF8.GetString((byte*) {varBasicString}YY._Mypair._Myval2._Bx._Buf, (int) {varBasicString}YY._Mypair._Myval2._Mysize))";
-
-                    ctx.Before.WriteLine($@"var {varBasicString}XX = {returnValue};");
                     ctx.Before.WriteLine($@"var {varBasicString} = {
                             basicString.Visit(typePrinter)}.{Helpers.CreateInstanceIdentifier}({
                             (usePointer ? string.Empty : $"new {typePrinter.IntPtrType}(&")}{
