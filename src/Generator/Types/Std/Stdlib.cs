@@ -434,7 +434,7 @@ namespace CppSharp.Types.Std
                     var typePrinter = new CSharpTypePrinter(ctx.Context);
                     string qualifiedBasicString = GetQualifiedBasicString(basicString);
                     string varBasicString = $"__basicStringRet{ctx.ParameterIndex}";
-                    string returnVarName= $"(*(({basicString.Visit(typePrinter)}.__Internal*) {ctx.ReturnVarName}));
+                    string returnVarName= $"(*(({basicString.Visit(typePrinter)}.__Internal*) {ctx.ReturnVarName}))";
                     
                     ctx.Before.WriteLine($@"var {varBasicString}YY = {returnVarName};");
                     if (!Platform.IsWindows)
