@@ -22,7 +22,7 @@ namespace CppSharp.Generators.C
         public bool PrintTypeModifiers { get; set; }
         public bool PrintVariableArrayAsPointers { get; set; }
 
-        public CppTypePrinter(BindingContext context) : base(TypePrinterContextKind.Managed)
+        public CppTypePrinter(BindingContext context) : base(TypePrinterContextKind.Native)
         {
             Context = context;
             PrintFlavorKind = CppTypePrintFlavorKind.Cpp;
@@ -127,6 +127,9 @@ namespace CppSharp.Generators.C
         public override TypePrinterResult VisitPointerType(PointerType pointer,
             TypeQualifiers quals)
         {
+            if (FindTypeMap(pointer, out TypePrinterResult result))
+                return result;
+
             var pointeeType = pointer.Pointee.Visit(this, pointer.QualifiedPointee.Qualifiers);
             if (pointeeType.TypeMap != null)
                 return pointeeType;
@@ -436,11 +439,25 @@ namespace CppSharp.Generators.C
             {
             case TypePrintScopeKind.Local:
             {
+                if (ContextKind == TypePrinterContextKind.Managed)
+                {
+                    return PrintLogicalNames ? declaration.LogicalName : declaration.Name;
+                }
+
                 return PrintLogicalNames ? declaration.LogicalOriginalName
                     : declaration.OriginalName;
             }
             case TypePrintScopeKind.Qualified:
             {
+                if (ContextKind == TypePrinterContextKind.Managed)
+                {
+                    var outputNamespace = declaration.TranslationUnit?.Module?.OutputNamespace;
+                    if (!string.IsNullOrEmpty(outputNamespace))
+                        return $"{outputNamespace}::{declaration.QualifiedName}";
+
+                    return declaration.QualifiedName;
+                }
+
                 if (declaration.Namespace is Class)
                     return $"{declaration.Namespace.Visit(this)}::{declaration.OriginalName}";
 
@@ -449,8 +466,11 @@ namespace CppSharp.Generators.C
             }
             case TypePrintScopeKind.GlobalQualified:
             {
+                var name = (ContextKind == TypePrinterContextKind.Managed) ?
+                            declaration.Name : declaration.OriginalName;
+
                 if (declaration.Namespace is Class)
-                    return $"{declaration.Namespace.Visit(this)}::{declaration.OriginalName}";
+                    return $"{declaration.Namespace.Visit(this)}::{name}";
 
                 var qualifier = PrintFlavorKind == CppTypePrintFlavorKind.Cpp ? "::" : string.Empty;
                 return qualifier + GetDeclName(declaration, TypePrintScopeKind.Qualified);

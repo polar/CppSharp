@@ -1539,10 +1539,10 @@ TypeAliasTemplate* Parser::WalkTypeAliasTemplate(
     HandleDeclaration(TD, TA);
 
     TA->name = GetDeclName(TD);
+    NS->Templates.push_back(TA);
+
     TA->TemplatedDecl = WalkDeclaration(TD->getTemplatedDecl());
     TA->Parameters = WalkTemplateParameterList(TD->getTemplateParameters());
-
-    NS->Templates.push_back(TA);
 
     return TA;
 }
@@ -1571,8 +1571,7 @@ FunctionTemplate* Parser::WalkFunctionTemplate(const clang::FunctionTemplateDecl
     if (auto MD = dyn_cast<CXXMethodDecl>(TemplatedDecl))
         Function = WalkMethodCXX(MD);
     else
-        Function = WalkFunction(TemplatedDecl, /*IsDependent=*/true,
-                                            /*AddToNamespace=*/false);
+        Function = WalkFunction(TemplatedDecl);
 
     FT = new FunctionTemplate();
     HandleDeclaration(TD, FT);
@@ -3157,12 +3156,11 @@ void Parser::MarkValidity(Function* F)
     c->getSema().getDiagnostics().setClient(existingClient, false);
 }
 
-void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
-                          bool IsDependent)
+void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F)
 {
     using namespace clang;
 
-    assert (FD->getBuiltinID() == 0);
+    assert(FD->getBuiltinID() == 0);
     auto FT = FD->getType()->getAs<clang::FunctionType>();
 
     auto NS = GetNamespace(FD);
@@ -3206,12 +3204,11 @@ void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
             HandlePreprocessedEntities(F, FTL.getParensRange(), MacroLocation::FunctionParameters);
         }
     }
-    
+
     auto ReturnType = FD->getReturnType();
     if (FD->isExternallyVisible())
         CompleteIfSpecializationType(ReturnType);
     F->returnType = GetQualifiedType(ReturnType, &RTL);
-    F->qualifiedType = GetQualifiedType(FD->getType(), &FTL);
 
     const auto& Mangled = GetDeclMangledName(FD);
     F->mangled = Mangled;
@@ -3232,7 +3229,7 @@ void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
         if (FTL)
         {
             auto FTInfo = FTL.castAs<FunctionTypeLoc>();
-            assert (!FTInfo.isNull());
+            assert(!FTInfo.isNull());
 
             ParamStartLoc = FTInfo.getLParenLoc();
             ResultLoc = FTInfo.getReturnLoc().getBeginLoc();
@@ -3283,7 +3280,7 @@ void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
     const CXXMethodDecl* MD;
     if (FD->isDependentContext() ||
         ((MD = dyn_cast<CXXMethodDecl>(FD)) && !MD->isStatic() &&
-         !HasLayout(cast<CXXRecordDecl>(MD->getDeclContext()))) ||
+            !HasLayout(cast<CXXRecordDecl>(MD->getDeclContext()))) ||
         !CanCheckCodeGenInfo(c->getSema(), FD->getReturnType().getTypePtr()) ||
         std::any_of(FD->parameters().begin(), FD->parameters().end(),
             [this](auto* P) { return !CanCheckCodeGenInfo(c->getSema(), P->getType().getTypePtr()); }))
@@ -3292,7 +3289,7 @@ void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
         return;
     }
 
-    auto& CGInfo = GetCodeGenFunctionInfo(codeGenTypes, FD);
+    auto& CGInfo = GetCodeGenFunctionInfo(codeGenTypes.get(), FD);
     F->isReturnIndirect = CGInfo.getReturnInfo().isIndirect() ||
         CGInfo.getReturnInfo().isInAlloca();
 
@@ -3307,8 +3304,7 @@ void Parser::WalkFunction(const clang::FunctionDecl* FD, Function* F,
     F->qualifiedType = GetQualifiedType(FD->getType(), &FTL);
 }
 
-Function* Parser::WalkFunction(const clang::FunctionDecl* FD, bool IsDependent,
-                                     bool AddToNamespace)
+Function* Parser::WalkFunction(const clang::FunctionDecl* FD)
 {
     using namespace clang;
 
@@ -3324,11 +3320,8 @@ Function* Parser::WalkFunction(const clang::FunctionDecl* FD, bool IsDependent,
 
     F = new Function();
     HandleDeclaration(FD, F);
-
-    if (AddToNamespace)
-        NS->Functions.push_back(F);
-
-    WalkFunction(FD, F, IsDependent);
+    NS->Functions.push_back(F);
+    WalkFunction(FD, F);
 
     return F;
 }
@@ -4173,9 +4166,7 @@ void Parser::SetupLLVMCodegen()
         c->getHeaderSearchOpts(), c->getPreprocessorOpts(),
         c->getCodeGenOpts(), *LLVMModule, c->getDiagnostics()));
 
-    CGT.reset(new clang::CodeGen::CodeGenTypes(*CGM.get()));
-
-    codeGenTypes = CGT.get();
+    codeGenTypes.reset(new clang::CodeGen::CodeGenTypes(*CGM.get()));
 }
 
 bool Parser::SetupSourceFiles(const std::vector<std::string>& SourceFiles,
@@ -4241,7 +4232,7 @@ void SemaConsumer::HandleTranslationUnit(clang::ASTContext& Ctx)
     Parser.WalkAST(TU);
 }
 
-ParserResult* Parser::ParseHeader(const std::vector<std::string>& SourceFiles)
+ParserResult* Parser::Parse(const std::vector<std::string>& SourceFiles)
 {
     assert(opts->ASTContext && "Expected a valid ASTContext");
 
@@ -4507,9 +4498,30 @@ ParserResult* ClangParser::ParseHeader(CppParserOptions* Opts)
     if (!Opts)
         return nullptr;
 
-    auto res = new ParserResult();
-    res->codeParser = new Parser(Opts);
-    return res->codeParser->ParseHeader(Opts->SourceFiles);
+    auto& Headers = Opts->SourceFiles;
+    if (Opts->unityBuild)
+    {
+        Parser parser(Opts);
+        return parser.Parse(Headers);
+    }
+
+    ParserResult* res = 0;
+    std::vector<Parser*> parsers;
+    for (size_t i = 0; i < Headers.size(); i++)
+    {
+        auto parser = new Parser(Opts);
+        parsers.push_back(parser);
+        std::vector<std::string> Header(&Headers[i], &Headers[i + 1]);
+        if (i < Headers.size() - 1)
+            delete parser->Parse(Header);
+        else
+            res = parser->Parse(Header);
+    }
+
+    for (auto parser : parsers)
+        delete parser;
+
+    return res;
 }
 
 ParserResult* ClangParser::ParseLibrary(CppParserOptions* Opts)

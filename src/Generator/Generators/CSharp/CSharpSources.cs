@@ -2220,7 +2220,7 @@ namespace CppSharp.Generators.CSharp
 
             var hasBaseClass = @class.HasBaseClass && @class.BaseClass.IsRefType;
             if (hasBaseClass)
-                WriteLineIndent(": base((void*) null)", @class.BaseClass.Visit(TypePrinter));
+                WriteLineIndent(": base((void*) native)", @class.BaseClass.Visit(TypePrinter));
 
             WriteOpenBraceAndIndent();
 
@@ -2229,15 +2229,15 @@ namespace CppSharp.Generators.CSharp
                 if (@class.BaseClass?.Layout.HasSubclassAtNonZeroOffset == true)
                     WriteLine("{0} = {1};", Helpers.PrimaryBaseOffsetIdentifier,
                         GetOffsetToBase(@class, @class.BaseClass));
-                if (!@class.IsAbstractImpl)
+                var hasVTables = @class.IsDynamic && GetUniqueVTableMethodEntries(@class).Count > 0;
+                if (!hasBaseClass || hasVTables)
                 {
                     WriteLine("if (native == null)");
                     WriteLineIndent("return;");
+                    if (!hasBaseClass)
+                        WriteLine($"{Helpers.InstanceIdentifier} = new global::System.IntPtr(native);");
                 }
-
-                WriteLine("{0} = new global::System.IntPtr(native);", Helpers.InstanceIdentifier);
                 var dtor = @class.Destructors.FirstOrDefault();
-                var hasVTables = @class.IsDynamic && GetUniqueVTableMethodEntries(@class).Count > 0;
                 var setupVTables = !@class.IsAbstractImpl && hasVTables && dtor?.IsVirtual == true;
                 if (setupVTables)
                 {
@@ -2257,7 +2257,7 @@ namespace CppSharp.Generators.CSharp
                     Unindent();
                 }
             }
-            else
+            else if (!hasBaseClass)
             {
                 WriteLine($"{Helpers.InstanceField} = *({TypePrinter.PrintNative(@class)}*) native;");
             }
@@ -2374,7 +2374,8 @@ namespace CppSharp.Generators.CSharp
             PopBlock(NewLineKind.BeforeNextBlock);
         }
 
-        public override void GenerateMethodSpecifier(Method method, Class @class)
+        public override void GenerateMethodSpecifier(Method method,
+            MethodSpecifierKind? kind = null)
         {
             bool isTemplateMethod = method.Parameters.Any(
                 p => p.Kind == ParameterKind.Extension);
@@ -2396,20 +2397,20 @@ namespace CppSharp.Generators.CSharp
 
             var functionName = GetMethodIdentifier(method);
 
+            var printedType = method.OriginalReturnType.Visit(TypePrinter);
+
             if (method.IsConstructor || method.IsDestructor)
                 Write("{0}(", functionName);
             else if (method.ExplicitInterfaceImpl != null)
-                Write("{0} {1}.{2}(", method.OriginalReturnType,
+                Write("{0} {1}.{2}(", printedType,
                     method.ExplicitInterfaceImpl.Name, functionName);
             else if (method.OperatorKind == CXXOperatorKind.Conversion ||
                      method.OperatorKind == CXXOperatorKind.ExplicitConversion)
             {
-                var printedType = method.OriginalReturnType.Visit(TypePrinter);
                 Write($"{functionName} {printedType}(");
             }
             else
-                Write("{0} {1}(", method.OriginalReturnType, functionName);
-
+                Write("{0} {1}(", printedType, functionName);
 
             Write(FormatMethodParameters(method.Parameters));
 
@@ -2426,7 +2427,7 @@ namespace CppSharp.Generators.CSharp
                 Write(Helpers.GetAccess(method.Access));
             }
 
-            GenerateMethodSpecifier(method, @class);
+            GenerateMethodSpecifier(method);
 
             if (method.SynthKind == FunctionSynthKind.DefaultValueOverload && method.IsConstructor && !method.IsPure)
             {
