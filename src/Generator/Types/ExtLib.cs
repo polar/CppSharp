@@ -557,27 +557,46 @@ ctx.Before.WriteLine($"// *({typePrinter.PrintNative(basicString)}*)");
             var insideTypeName = insideType.Visit(typePrinter);
             var vectorName = $"__vector{ctx.ParameterIndex}";
             var listName = $"__list{ctx.ParameterIndex}";
-            ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._M_impl;");
+            if (Platform.IsWindows)
+                if (insideTypeName == "bool")
+                    ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._Myvec._Mypair._Myval2;");
+                else
+                    ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._Mypair._Myval2;");
+            else
+            	ctx.Before.WriteLine($@"var {vectorName} =  ({typeCast}{ctx.ReturnVarName})._M_impl;");
             var itemSizeName = $"__itemSize{ctx.ParameterIndex}";
             
             ctx.Before.WriteLine($@"var {itemSizeName} = VectorHolder<{insideTypeName}>.itemSize();");
             if (isEnumType(insideType.Type))
             {
-                
                 var arrayName = $"__list{ctx.ParameterIndex}Array";
                 ctx.Before.WriteLine($@"var {arrayName} = ALK.Interop.Utils.toEnumArrayFromNative<{insideTypeName}>({vectorName});");
                 ctx.Before.WriteLine($@"var {listName} = new System.Collections.Generic.List<{insideTypeName}>({arrayName});");
             }
-            else if (insideTypeName == "bool")
-            {
-                var arrayName = $"__list{ctx.ParameterIndex}Array";
-                ctx.Before.WriteLine($@"var {arrayName} = ALK.Interop.Utils.toBoolArray({vectorName});");
-                ctx.Before.WriteLine($@"var {listName} = new System.Collections.Generic.List<{insideTypeName}>({arrayName});");
-            }
             else
             {
-                var createFunction = getCreateFunction(insideTypeName);
-                ctx.Before.WriteLine($@"var {listName} = ALK.Interop.Utils.toList<{insideTypeName}>({createFunction}, {itemSizeName}, {vectorName});");
+                if (!Platform.IsWindows)
+                {
+                    if (insideTypeName == "bool")
+                    {
+                        var arrayName = $"__list{ctx.ParameterIndex}Array";
+                        ctx.Before.WriteLine($@"var {arrayName} = ALK.Interop.Utils.toBoolArray({vectorName});");
+                        ctx.Before.WriteLine(
+                            $@"var {listName} = new System.Collections.Generic.List<{insideTypeName}>({arrayName});");
+                    }
+                    else
+                    {
+                        var createFunction = getCreateFunction(insideTypeName);
+                        ctx.Before.WriteLine(
+                            $@"var {listName} = ALK.Interop.Utils.toList<{insideTypeName}>({createFunction}, {itemSizeName}, {vectorName});");
+                    }
+                }
+                else
+                {
+                    var createFunction = getCreateFunction(insideTypeName);
+                    ctx.Before.WriteLine(
+                        $@"var {listName} = ALK.Interop.Utils.toList<{insideTypeName}>({createFunction}, {itemSizeName}, {vectorName});");
+                }
             }
 
             var returnName = listName;
