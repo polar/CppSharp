@@ -17,9 +17,11 @@ namespace CppSharp.Passes
         public PolarSymbolsCodeGenerator(BindingContext context, IEnumerable<TranslationUnit> units)
             : base(context, units)
         {
-            cppTypePrinter = new CppTypePrinter(context)
+            cppTypePrinter = new CppTypePrinter(Context)
             {
-                ScopeKind = TypePrintScopeKind.Qualified
+                ScopeKind = TypePrintScopeKind.Qualified,
+                ResolveTypedefs = true,
+                ResolveTypeMaps = false
             };
         }
 
