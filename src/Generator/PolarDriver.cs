@@ -146,7 +146,7 @@ namespace CppSharp
             }
             else
             {
-                ParserOptions.TargetTriple = architecture + "-windows-msvc";
+                ParserOptions.TargetTriple = "x86_64-pc-win32";
                 ParserOptions.Setup();
                 ParserOptions.SetupMSVC();
             }
