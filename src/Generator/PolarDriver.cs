@@ -146,7 +146,7 @@ namespace CppSharp
             }
             else
             {
-                ParserOptions.TargetTriple = architecture + "-windows";
+                ParserOptions.TargetTriple = architecture + "-windows-msvc";
                 ParserOptions.Setup();
                 ParserOptions.SetupMSVC();
             }
