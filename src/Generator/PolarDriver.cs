@@ -16,6 +16,8 @@ namespace CppSharp
     {
         public Dictionary<string, Module> Modules;
 
+        //  Options: Just for parity with Driver class
+        public DriverOptions Options { get; private set; }
         public ParserOptions ParserOptions;
         public BindingContext Context;
         public Generators.Generator Generator;
@@ -30,6 +32,10 @@ namespace CppSharp
         
         public PolarDriver()
         {
+            // We only use the DriverOptions for parity here using Options.IsCSharpGenerator
+            Options = new DriverOptions();
+            Options.GeneratorKind = GeneratorKind.CSharp;
+            
             DriverOptions = new PolarDriverOptions();
             ParserOptions = new ParserOptions();
             Context = new BindingContext(DriverOptions, ParserOptions);
@@ -299,45 +305,99 @@ namespace CppSharp
         
         PolarGenerateExtSymbolsPass PolarGenerateExtSymbolsPass = new PolarGenerateExtSymbolsPass();
         
+        // Difference with CppSharp defaults:
+        // No Library, we are generating everything explicitly, not making an api command.
+        // Options.IsCSharpGenerator is always true, since that is what we are doing.
+        // We have our own GenerateSymbolsPoss: PolarGenerateSymbolsPass.
+        // We have a state retaining SymbolsPass for the multiple passes of passes.: PolarGenerateExtSymbolsPass.
+        // We do NOT change parameterless functions to instance methods: FunctionToInstanceMethodPass
+        // We have better dealings with the CPP Sharp Macros CS_INGNORE, CS_IN, CS_OUT: PolarCheckMacroPass
+        // We do NOT change GetXXX() SetXXX(x) to C# properties: GetterSetterToPropertyPass
+        // We do NOT rename classes and methods to camel case: RenameDeclsUpperCase
         public void SetupPasses()
         {
             var TranslationUnitPasses = Context.TranslationUnitPasses;
             TranslationUnitPasses.Passes.Clear();
             TranslationUnitPasses.AddPass(new ResolveIncompleteDeclsPass());
             TranslationUnitPasses.AddPass(new IgnoreSystemDeclarationsPass());
-            TranslationUnitPasses.AddPass(new EqualiseAccessOfOverrideAndBasePass());
+            
+            if (Options.IsCSharpGenerator)
+                TranslationUnitPasses.AddPass(new EqualiseAccessOfOverrideAndBasePass());
+            
             TranslationUnitPasses.AddPass(new CheckIgnoredDeclsPass());
-            TranslationUnitPasses.AddPass(new TrimSpecializationsPass());
-            TranslationUnitPasses.AddPass(new PolarGenerateSymbolsPass());
-            TranslationUnitPasses.AddPass(PolarGenerateExtSymbolsPass);
-            TranslationUnitPasses.AddPass(new CheckIgnoredDeclsPass());
-            TranslationUnitPasses.AddPass(new FunctionToInstanceMethodPass());
-            TranslationUnitPasses.AddPass(new MarshalPrimitivePointersAsRefTypePass());
+            
+            if (Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new TrimSpecializationsPass());
+                //TranslationUnitPasses.AddPass(new CheckAmbiguousFunctions());
+                //TranslationUnitPasses.AddPass(new GenerateSymbolsPass());
+                TranslationUnitPasses.AddPass(new PolarGenerateSymbolsPass());
+                TranslationUnitPasses.AddPass(PolarGenerateExtSymbolsPass);
+                TranslationUnitPasses.AddPass(new CheckIgnoredDeclsPass());
+            }
+            
+            //library.SetupPasses(this);
+            
             TranslationUnitPasses.AddPass(new FindSymbolsPass());
+            //TranslationUnitPasses.AddPass(new CheckMacroPass());
             TranslationUnitPasses.AddPass(new PolarCheckMacroPass());
             TranslationUnitPasses.AddPass(new CheckStaticClass());
-            TranslationUnitPasses.AddPass(new MoveFunctionToClassPass());
+
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new MoveFunctionToClassPass());
+            }
+
             TranslationUnitPasses.AddPass(new CheckAmbiguousFunctions());
             TranslationUnitPasses.AddPass(new ConstructorToConversionOperatorPass());
             TranslationUnitPasses.AddPass(new MarshalPrimitivePointersAsRefTypePass());
-            TranslationUnitPasses.AddPass(new CheckOperatorsOverloadsPass());
+
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new CheckOperatorsOverloadsPass());
+            }
+
             TranslationUnitPasses.AddPass(new CheckVirtualOverrideReturnCovariance());
             TranslationUnitPasses.AddPass(new CleanCommentsPass());
+            
+            Generator.SetupPasses();
+            
             TranslationUnitPasses.AddPass(new FlattenAnonymousTypesToFields());
             TranslationUnitPasses.AddPass(new CleanInvalidDeclNamesPass());
             TranslationUnitPasses.AddPass(new FieldToPropertyPass());
             TranslationUnitPasses.AddPass(new CheckIgnoredDeclsPass());
             TranslationUnitPasses.AddPass(new CheckFlagEnumsPass());
             //TranslationUnitPasses.AddPass(new MakeProtectedNestedTypesPublicPass());
-            TranslationUnitPasses.AddPass(new GenerateAbstractImplementationsPass());
-            TranslationUnitPasses.AddPass(new MultipleInheritancePass());
-            TranslationUnitPasses.AddPass(new DelegatesPass());
+
+            if (Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new GenerateAbstractImplementationsPass());
+                TranslationUnitPasses.AddPass(new MultipleInheritancePass());
+            }
+
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new DelegatesPass());
+            }
+
+            //TranslationUnitPasses.AddPass(new GetterSetterToPropertyPass());
             TranslationUnitPasses.AddPass(new StripUnusedSystemTypesPass());
-            TranslationUnitPasses.AddPass(new SpecializationMethodsWithDependentPointersPass());
-            TranslationUnitPasses.AddPass(new ParamTypeToInterfacePass());
+
+            if (Options.IsCSharpGenerator)
+            {
+                TranslationUnitPasses.AddPass(new SpecializationMethodsWithDependentPointersPass());
+                TranslationUnitPasses.AddPass(new ParamTypeToInterfacePass());
+            }
+
             TranslationUnitPasses.AddPass(new CheckDuplicatedNamesPass());
+
             TranslationUnitPasses.AddPass(new MarkUsedClassInternalsPass());
-            TranslationUnitPasses.AddPass(new CheckKeywordNamesPass());
+
+            if (Options.IsCLIGenerator || Options.IsCSharpGenerator)
+            {
+                //TranslationUnitPasses.RenameDeclsUpperCase(RenameTargets.Any & ~RenameTargets.Parameter);
+                TranslationUnitPasses.AddPass(new CheckKeywordNamesPass());
+            }
         }
 
         public List<GeneratorOutput> generate()
@@ -357,6 +417,37 @@ namespace CppSharp
             Context.RunPasses();
         }
 
+        // Differences with CppSharp Defaults.
+        // CppSharp:
+        //    ProcessCode:
+        //       Sets up passes, and parses code, runs the passes,
+        //       generates the code (CLI or C#),
+        //       optionally compiles the C++ code.
+        // In contrast:
+        // We effectively parse the entire given code base twice: once to find
+        // out what templates we need (Optional<T>, VectorHolder<T>), generate
+        // code for those templates, and then parse everything again to get
+        // ready for code generation.
+        //
+        // PassOne:
+        //   Set up the passes and the type maps and add the main module files and parse.
+        // PassTwo: Run the passes on the parsed AST.
+        // PassThree:
+        //   If we generated any external symbols, then we must recompile the 
+        //   whole kit and kabootle with the generated symbols.
+        //   It's just easier that way, then trying to generate the needed code for the
+        //   extra headers on the first pass. We let this tool do it.
+        //   The second pass differs in that we remove the pass that generates the
+        //   extra symbols, since we've already done that and we don't want to clobber
+        //   the file: removing PolarExtGenerateSymbolsPass.
+        //   We add the Ext module which now contains the generated headers.
+        //   Set up the passes, and typemaps, parse again.
+        //   Then run the passes again.
+        //   At this point we should have a generatable tree.
+        // PassFour:
+        //    Generate the C# and symbols files.  We are only using the CSharpGenerator.
+        // We do not have a compile C++ option. We are just generating the C# what we need.
+        
         public void passOne()
         {
             SetupPasses();
