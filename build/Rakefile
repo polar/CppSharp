@@ -1,0 +1,14 @@
+
+def build_platform
+  RUBY_PLATFORM =~ /linux/ ? "linux" : "win"
+end
+
+task :download_llvm do
+	if build_platform == "linux"
+		sh "./premake5-linux-64 --file=LLVM.lua download_llvm"
+	else
+		sh "DownloadDeps.bat"
+	end
+end
+
+task :fix_llvm => [""]
