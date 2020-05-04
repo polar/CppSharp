@@ -225,25 +225,42 @@ namespace CppSharp
                 Console.Error.WriteLine(m);
         }
 
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
             List<string> errorMessages = new List<string>();
             bool helpShown = false;
 
             try
             {
-                if (!ParseCommandLineArgs(args, errorMessages, ref helpShown))
-                {
-                    PrintErrorMessages(errorMessages);
 
-                    // Don't need to show the help since if ParseCommandLineArgs returns false the help has already been shown
-                    return;
+                var tries = 10;
+                while(tries > 0) {
+                    try
+                    {
+                        optionSet = new OptionSet();
+                        driver = new PolarDriver();
+                        if (!ParseCommandLineArgs(args, errorMessages, ref helpShown))
+                        {
+                            PrintErrorMessages(errorMessages);
+
+                            // Don't need to show the help since if ParseCommandLineArgs returns false the help has already been shown
+                            return 0;
+                        }
+
+                        driver.FinalizeSetup();
+                        PrintErrorMessages(errorMessages);
+                        driver.run();
+                        return 0;
+                    }
+                    catch (Exception e2)
+                    {
+                        PrintErrorMessages(errorMessages);
+                        if (--tries == 0)
+                            throw e2;
+                    }
                 }
 
-                driver.FinalizeSetup();
-                PrintErrorMessages(errorMessages);
-
-                driver.run();
+                return 1;
             }
             catch (Exception ex)
             {
