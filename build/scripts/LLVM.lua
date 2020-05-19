@@ -110,7 +110,7 @@ function get_llvm_package_name(rev, conf, arch)
 			else
 				version = string.match(version, "%d+")
 			end
-			table.insert(components, "gcc-"..version)
+			table.insert(components, "gcc-".."7")
 		end
   end
 
