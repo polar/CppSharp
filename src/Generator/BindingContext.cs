@@ -23,6 +23,11 @@ namespace CppSharp.Generators
 
         public bool PolarFixesEnabled = false;
 
+        public bool PolarGenerateProfilingCode
+        {
+            get { return PolarFixesEnabled && ((PolarDriverOptions) Options).GenerateProfilingCode; }
+        }
+
         public BindingContext(DriverOptions options, ParserOptions parserOptions = null)
         {
             Options = options;

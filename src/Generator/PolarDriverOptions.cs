@@ -41,5 +41,12 @@ namespace CppSharp
         {
             OptionalName = name;
         }
+
+        public bool GenerateProfilingCode;
+
+        public void SetGenerateProfilingCode(bool val)
+        {
+            GenerateProfilingCode = val;
+        }
     }
 }

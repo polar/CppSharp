@@ -2283,20 +2283,34 @@ namespace CppSharp.Generators.CSharp
                     Context.Symbols.FindLibraryBySymbol(dtor.Mangled, out library))
                 {
                     WriteLine("if (disposing)");
-                    if (@class.IsDependent || dtor.IsVirtual)
+                    if (Context.PolarFixesEnabled)
+                    {
                         WriteOpenBraceAndIndent();
+                    }
                     else
-                        Indent();
+                    {
+                        if (@class.IsDependent || dtor.IsVirtual)
+                            WriteOpenBraceAndIndent();
+                        else
+                            Indent();
+                    }
                     if (dtor.IsVirtual)
                         this.GenerateMember(@class, c => GenerateDestructorCall(
                             c is ClassTemplateSpecialization ?
                                 c.Methods.First(m => m.InstantiatedFrom == dtor) : dtor), true);
                     else
                         this.GenerateMember(@class, c => GenerateMethodBody(c, dtor), true);
-                    if (@class.IsDependent || dtor.IsVirtual)
+                    if (Context.PolarFixesEnabled)
+                    {
                         UnindentAndWriteCloseBrace();
+                    }
                     else
-                        Unindent();
+                    {
+                        if (@class.IsDependent || dtor.IsVirtual)
+                            UnindentAndWriteCloseBrace();
+                        else
+                            Unindent();
+                    }
                 }
             }
 
@@ -2964,6 +2978,11 @@ internal static{(@new ? " new" : string.Empty)} {printedClass} __GetInstance({Ty
         public void GenerateFunctionCall(string functionName, Function function,
             QualifiedType returnType = default(QualifiedType))
         {
+
+            if (Context.PolarGenerateProfilingCode)
+            {
+                WriteLine("var __RequestContext = global::ALK.Interop.Stats.M(\"{0}.{1}\");", function.Namespace.Name, function.Name);
+            }
             // ignored functions may get here from interfaces for secondary bases
             if (function.Ignore)
             {
@@ -3086,7 +3105,12 @@ internal static{(@new ? " new" : string.Empty)} {printedClass} __GetInstance({Ty
                     WriteLine("var __instancePtr = &{0}.{1};", operatorParam.Name, Helpers.InstanceField);
                 }
             }
-
+            
+            if (Context.PolarGenerateProfilingCode)
+            {
+                WriteLine("__RequestContext.addMarshalTime();");
+            }
+            
             if (needsReturn && !originalFunction.HasIndirectReturnTypeParameter)
                 Write("var {0} = ", Helpers.ReturnIdentifier);
 
@@ -3097,11 +3121,22 @@ internal static{(@new ? " new" : string.Empty)} {printedClass} __GetInstance({Ty
                     ((Class) method.OriginalNamespace).Layout.Size});");
                 names.Insert(0, Helpers.ReturnIdentifier);
             }
+
             WriteLine("{0}({1});", functionName, string.Join(", ", names));
+
+            if (Context.PolarGenerateProfilingCode)
+            {
+                WriteLine("__RequestContext.addCppTime();");
+            }
 
             foreach (TextGenerator cleanup in from p in @params
                                               select p.Context.Cleanup)
                 Write(cleanup);
+
+            if (Context.PolarGenerateProfilingCode)
+            {
+                WriteLine("__RequestContext.addUnmarshalTime();");
+            }
 
             if (needsReturn)
             {
@@ -3122,10 +3157,22 @@ internal static{(@new ? " new" : string.Empty)} {printedClass} __GetInstance({Ty
                 if (ctx.HasCodeBlock)
                     Indent();
 
+                if (Context.PolarGenerateProfilingCode)
+                {
+                    WriteLine("__RequestContext.addRequestTime();");
+                }
+
                 WriteLine($"return {marshal.Context.Return};");
 
                 if (ctx.HasCodeBlock)
                     UnindentAndWriteCloseBrace();
+            }
+            else
+            {
+                if (Context.PolarGenerateProfilingCode)
+                {
+                    WriteLine("__RequestContext.addRequestTime();");
+                }
             }
 
             if (needsFixedThis && operatorParam == null)
