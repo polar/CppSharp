@@ -110,7 +110,7 @@ function get_llvm_package_name(rev, conf, arch)
 			else
 				version = string.match(version, "%d+")
 			end
-			table.insert(components, "gcc-"..version)
+			table.insert(components, "gcc-".."7")
 		end
   end
 
@@ -170,7 +170,7 @@ function download_llvm()
           "Please upgrade to a newer VS version or compile LLVM manually.")
   end
 
-  local base = "https://github.com/mono/CppSharp/releases/download/CppSharp/"
+  local base = "https://github.com/polar/CppSharp/releases/download/CppSharp/"
   local pkg_name = get_llvm_package_name()
   local archive = pkg_name .. archive_ext
 
