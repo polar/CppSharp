@@ -44,8 +44,14 @@ namespace CppSharp
             DriverOptions.AddModule(ExtModule);
             DriverOptions.GenerateClassTemplates = true;
             DriverOptions.UseHeaderDirectories = false;
+            DriverOptions.GenerateProfilingCode = false;
         }
 
+        public void SetGenerateProfilingCode(bool val)
+        {
+            DriverOptions.SetGenerateProfilingCode(val);
+        }
+        
         public void SetVectorHolderPath(string path)
         {
             DriverOptions.SetVectorHolderPath(path);

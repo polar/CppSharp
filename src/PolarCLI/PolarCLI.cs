@@ -30,6 +30,7 @@ namespace CppSharp
             optionSet.Add("p=|platform=", "the {PLATFORM} that the generated code will target: 'win', 'osx' or 'linux'", p => { GetDestinationPlatform(p, errorMessages); } );
             optionSet.Add("a=|arch=", "the {ARCHITECTURE} that the generated code will target: 'x86' or 'x64'", a => { GetDestinationArchitecture(a, errorMessages); } );
 
+            optionSet.Add("P", "Generate Profiling Code", a => { SetGenerateProfilingCode(true); });
             optionSet.Add("h|help", "shows the help", hl => { showHelp = (hl != null); });
 
             List<string> additionalArguments = null;
@@ -109,6 +110,11 @@ namespace CppSharp
                 Console.WriteLine("Exception : " + e.Message);
                 driver.setOutputDirectory(".");
             }
+        }
+
+        static void SetGenerateProfilingCode(bool val)
+        {
+            driver.SetGenerateProfilingCode(val);
         }
 
         static void SetVectorHolderPath(string path)
