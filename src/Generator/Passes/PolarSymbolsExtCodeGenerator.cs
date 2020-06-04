@@ -62,7 +62,7 @@ namespace CppSharp.Passes
         public override bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecialization specialization)
         {
                 var typePrinter = new CppSharp.Generators.CSharp.CSharpTypePrinter(Context); 
-System.Console.WriteLine($"VisitClassTemplateSpeciationDecl: {specialization.Visit(typePrinter).Type}");
+//System.Console.WriteLine($"VisitClassTemplateSpeciationDecl: {specialization.Visit(typePrinter).Type}");
             if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "XXX")
             {
                 var itemType = specialization.Arguments[0].Type.Type;

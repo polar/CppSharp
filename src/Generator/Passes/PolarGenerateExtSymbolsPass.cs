@@ -138,13 +138,13 @@ namespace CppSharp.Passes
             if (a.Type.Type == null ||
                 ASTUtils.IsTypeExternal(specialization.TranslationUnit.Module, a.Type.Type))
             {
-                System.Console.WriteLine($"UnspportedTemplateArgument External {a.Type.Type}!");
+                //System.Console.WriteLine($"UnspportedTemplateArgument External {a.Type.Type}!");
                 return true;
             }
 
             var typeIgnoreChecker = new TypeIgnoreChecker(typeMaps);
             a.Type.Type.Visit(typeIgnoreChecker);
-            System.Console.WriteLine($"UnspportedTemplateArgument {a.Type.Type} isIgnored {typeIgnoreChecker.IsIgnored}!");
+            //System.Console.WriteLine($"UnspportedTemplateArgument {a.Type.Type} isIgnored {typeIgnoreChecker.IsIgnored}!");
             return typeIgnoreChecker.IsIgnored;
         }
         // The purpuse of this class is to see if we need to specialize a vector class.
@@ -160,7 +160,7 @@ namespace CppSharp.Passes
             if (typeMap != null)
             {
                 var typePrinter = new CppSharp.Generators.CSharp.CSharpTypePrinter(typeMap.Context); 
-                System.Console.WriteLine($"IsVectorSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
+                //System.Console.WriteLine($"IsVectorSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
                 if (typeMap is CppSharp.Types.Ext.Vector)
                 {
                     if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "std::vector")
@@ -168,7 +168,7 @@ namespace CppSharp.Passes
                         if (specialization.Arguments.Any(a => UnsupportedTemplateArgument(
                             specialization, a, typeMaps)))
                         {
-                            System.Console.WriteLine($"IsVectorSpecializationNeeded: Returning false for {specialization.Visit(typePrinter).Type}");
+                            //System.Console.WriteLine($"IsVectorSpecializationNeeded: Returning false for {specialization.Visit(typePrinter).Type}");
                             return false;
                         }
                     }
@@ -186,14 +186,14 @@ namespace CppSharp.Passes
             if (typeMap != null)
             {
                 var typePrinter = new CppSharp.Generators.CSharp.CSharpTypePrinter(typeMap.Context); 
-                System.Console.WriteLine($"IsOptionalSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
+                //System.Console.WriteLine($"IsOptionalSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
                 
                 if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "Interop::Optional")
                 {
                     if (specialization.Arguments.Any(a => UnsupportedTemplateArgument(
                         specialization, a, typeMaps)))
                     {
-                        System.Console.WriteLine($"IsOptionalSpecializationNeeded: Returning false for  {specialization.Visit(typePrinter).Type}");
+                        //System.Console.WriteLine($"IsOptionalSpecializationNeeded: Returning false for  {specialization.Visit(typePrinter).Type}");
                         return false;
                     }
                 }

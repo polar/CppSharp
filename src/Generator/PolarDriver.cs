@@ -255,6 +255,24 @@ namespace CppSharp
             //DriverOptions.Modules.RemoveAll(m => m != DriverOptions.SystemModule && !m.Units.GetGenerated().Any());
         }
 
+        public bool TryParse()
+        {
+            var limit = 10;
+            while (limit > 0)
+            {
+                try
+                {
+                    Parse();
+                    return true;
+                }
+                catch (System.Exception e)
+                {
+                    --limit;
+                }
+            }
+
+            return false;
+        }
         public void SortModulesByDependencies()
         {
             var sortedModules = DriverOptions.Modules.TopologicalSort(m =>
@@ -459,32 +477,76 @@ namespace CppSharp
             SetupPasses();
             SetupTypeMaps();
             DriverOptions.AddModule(mainModule);
-            Diagnostics.Message("Parsing code...");
+            Diagnostics.Message("Pass 1: Parsing Code ...");
             Parse();
         }
 
         public void passTwo()
         {
+            Diagnostics.Message("Pass 2: Generating External Symbols ...");
             runPasses();
         }
 
-        public void passThree()
+        public bool TryRunPasses()
+        {
+            try
+            {
+                runPasses();
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                return false;
+            }
+        }
+
+        // There is some bizzare error in which things get messed up on the C++ side, so things like
+        // decl.GetItems(i) or decl.GetClasses(i), etc. return the wrong thing, and sometimes they are
+        // coerced to null. This situation causes NullPointer exceptions down the road, or other errors.
+        // It seems, I think, to be heap releated and maybe resource dependent. This situation, of course,
+        // leaves the problem really hard to find. So, I punt. The fail in the second parsing will happen
+        // in ASTConvert and usually come upon a .GetXXX(i) as WWWWW that unexpectantly gets coerced to null.
+        // So, the parser will try some number of times until it makes it through. Gawd aweful, I know.
+        // If it makes it through the parser, and fails in the passes, then we must reparse. 
+        public bool passThree()
         {
             if (PolarGenerateExtSymbolsPass.PathOfGeneratedSymbolsFile != null)
             {
+                Diagnostics.Message("Pass 3: Reparsing Code ...");
                 mainModule.Headers.Add(Path.GetFullPath(PolarGenerateExtSymbolsPass.PathOfGeneratedSymbolsFile));
-                SetupPasses();
-                SetupTypeMaps();
-                Parse();
-                Context.TranslationUnitPasses.Passes.Remove(PolarGenerateExtSymbolsPass);
-                Diagnostics.Level = DiagnosticKind.Debug;
-                runPasses();
-                Context.Options.Modules.Remove(ExtModule);
+                var limit = 10;
+                while (limit > 0)
+                {
+                    SetupPasses();
+                    SetupTypeMaps();
+                    if (TryParse())
+                    {
+                        Context.TranslationUnitPasses.Passes.Remove(PolarGenerateExtSymbolsPass);
+                        if (TryRunPasses())
+                        {
+                            Context.Options.Modules.Remove(ExtModule);
+                            return true;
+                        }
+                    }
+
+                    limit--;
+                }
+
+                Diagnostics.Message("Pass 3: Error. Cannot survive errors.");
+
+                return false;
             }
+            else
+            {
+                Diagnostics.Message("Pass 3: No action needed.");
+                return true;
+            }
+
         }
 
         public void passFour()
         {
+            Diagnostics.Message("Pass 4: Generating C# code.");
             var outputs = generate();
         }
 
@@ -492,8 +554,15 @@ namespace CppSharp
         {
             passOne();
             passTwo();
-            passThree();
-            passFour();
+            if (passThree())
+            {
+                passFour();
+            }
+            else
+            {
+                Diagnostics.Message("Error: Could not surive errors");
+            }
+            Diagnostics.Message("Done.");
         }
 
         public string SaveFile(GeneratorOutput output)

@@ -416,8 +416,7 @@ namespace CppSharp.Types.Std
             var type = Type.Desugar(resolveTemplateSubstitution: false);
             bool usePointer = type.IsAddress() || ctx.MarshalKind == MarshalKind.NativeField  ||
                 ctx.MarshalKind == MarshalKind.ReturnVariableArray;
-            System.Console.WriteLine(
-                $"UsePointer={usePointer} type {type}, MarshalKind {ctx.MarshalKind} ReturnVarName = {ctx.ReturnVarName}");
+            //System.Console.WriteLine($"UsePointer={usePointer} type {type}, MarshalKind {ctx.MarshalKind} ReturnVarName = {ctx.ReturnVarName}");
             if (Context.PolarFixesEnabled)
             {
                 if (!usePointer)
