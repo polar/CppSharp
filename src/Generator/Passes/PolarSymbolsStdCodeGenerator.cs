@@ -23,11 +23,9 @@ namespace CppSharp.Passes
             WriteLine("#define _LIBCPP_HIDE_FROM_ABI");
             NewLine();
 
-            System.Console.WriteLine($"Creating Std-symbols.cpp");
+            Diagnostics.Message($"Creating Std-symbols.cpp");
             if (TranslationUnit.Module == Options.SystemModule)
             {
-                System.Console.WriteLine("#include <string>");
-                System.Console.WriteLine("#include <vector>");
                 WriteLine("#include <string>");
                 WriteLine("#include <vector>");
             }
@@ -38,19 +36,18 @@ namespace CppSharp.Passes
             {
                 if (module != Options.SystemModule && module.LibraryName != "Ext")
                 {
-                    System.Console.WriteLine($"From Module {module.LibraryName}");
+                    Diagnostics.Message($"From Module {module.LibraryName}");
                     foreach (var header in module.Headers)
                     {
                         // The Ext library .cpp files got added to the main module, so we do not want those.
                         if (!header.EndsWith(".cpp"))
                         {
-                            System.Console.WriteLine($"#include \"{header}\"");
                             WriteLine($"#include \"{header}\"");
                         }
                     }
                 }
             }
-            System.Console.WriteLine($"Created Std-symbols.cpp");
+            Diagnostics.Message($"Created Std-symbols.cpp");
             NewLine();
         }
     }
