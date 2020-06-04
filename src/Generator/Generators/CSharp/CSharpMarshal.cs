@@ -217,6 +217,8 @@ namespace CppSharp.Generators.CSharp
                     return true;
                 }
                 Context.Return.Write("*");
+                if (Context.MarshalKind == MarshalKind.NativeField)
+                    Context.Return.Write($"({pointer.QualifiedPointee.Visit(typePrinter)}*) ");
             }
 
             Context.Return.Write(Context.ReturnVarName);

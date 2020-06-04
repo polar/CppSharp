@@ -85,6 +85,7 @@ public:
 
     Foo();
     Foo(Private p);
+    Foo(const float& f);
     int A;
     float B;
     IgnoredType ignoredType;
@@ -191,7 +192,9 @@ enum Enum
     A = 0, B = 2, C = 5,
     //D = 0x80000000,
     E = 0x1,
-    F = -9
+    F = -9,
+    NAME_A = 10,
+    NAME__A = 20
 };
 
 typedef char TypedefChar;
@@ -598,7 +601,9 @@ public:
 
     TestProperties();
     TestProperties(const TestProperties& other);
+    TestProperties& operator=(const TestProperties& other);
     int Field;
+    const int& ConstRefField;
 
     int getFieldValue();
     void setFieldValue(int Value);
@@ -619,7 +624,7 @@ public:
     void set(int value);
 
     int setterReturnsBoolean();
-    bool setterReturnsBoolean(int value);
+    bool setSetterReturnsBoolean(int value);
 
     virtual int virtualSetterReturnsBoolean();
     virtual bool setVirtualSetterReturnsBoolean(int value);
@@ -645,6 +650,9 @@ public:
     Conflict GetConflict();
     void SetConflict(Conflict _conflict);
 
+    virtual int(*getCallback())(int);
+    virtual void setCallback(int(*value)(int));
+
 private:
     int FieldValue;
     double _refToPrimitiveInSetter;
@@ -652,6 +660,7 @@ private:
     int _setterReturnsBoolean;
     int _virtualSetterReturnsBoolean;
     Conflict _conflict;
+    int(*_callback)(int);
 };
 
 class DLL_API HasOverridenSetter : public TestProperties
@@ -1555,6 +1564,27 @@ typedef const char* LPCSTR;
 DLL_API LPCSTR TakeTypedefedMappedType(LPCSTR string);
 DLL_API std::string UTF8;
 
+typedef enum SE4IpAddr_Tag {
+    V4,
+    V6,
+} SE4IpAddr_Tag;
+
+typedef struct {
+    uint8_t _0[4];
+} SE4V4_Body;
+
+typedef struct {
+    uint8_t _0[16];
+} SE4V6_Body;
+
+typedef struct {
+    SE4IpAddr_Tag tag;
+    union {
+        SE4V4_Body v4;
+        SE4V6_Body v6;
+    };
+} SE4IpAddr;
+
 struct DLL_API StructWithCopyCtor
 {
     StructWithCopyCtor();
@@ -1608,6 +1638,21 @@ class TemplateClass : TemplateClassBase<A,B> {
     using Func = std::function<B(XType)>;
     explicit TemplateClass(Func function) {}
 };
+
+template <typename T>
+class QScopedPointer
+{
+public:
+    typedef T* QScopedPointer::* RestrictedBool;
+    operator RestrictedBool()
+    {
+    }
+};
+
+class QObjectData {
+};
+
+QScopedPointer<QObjectData> d_ptr;
 
 struct DLL_API PointerToTypedefPointerTest
 {

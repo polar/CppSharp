@@ -54,6 +54,11 @@ Foo::Foo(Private p)
 {
 }
 
+Foo::Foo(const float& f)
+{
+    B = f;
+}
+
 const char* Foo::GetANSI()
 {
     return "ANSI";
@@ -542,7 +547,8 @@ SomeNamespace::AbstractClass::~AbstractClass()
 
 TestProperties::TestProperties() : Field(0), _refToPrimitiveInSetter(0),
     _getterAndSetterWithTheSameName(0), _setterReturnsBoolean(0),
-    _virtualSetterReturnsBoolean(0), _conflict(Conflict::Value1)
+    _virtualSetterReturnsBoolean(0), _conflict(Conflict::Value1),
+    ConstRefField(Field)
 {
 }
 
@@ -552,8 +558,20 @@ TestProperties::TestProperties(const TestProperties& other) : Field(other.Field)
     _getterAndSetterWithTheSameName(other._getterAndSetterWithTheSameName),
     _setterReturnsBoolean(other._setterReturnsBoolean),
     _virtualSetterReturnsBoolean(other._virtualSetterReturnsBoolean),
-    _conflict(other._conflict)
+    _conflict(other._conflict), ConstRefField(other.ConstRefField)
 {
+}
+
+TestProperties& TestProperties::operator=(const TestProperties& other)
+{
+    Field = other.Field;
+    FieldValue = other.FieldValue;
+    _refToPrimitiveInSetter = other._refToPrimitiveInSetter;
+    _getterAndSetterWithTheSameName = other._getterAndSetterWithTheSameName;
+    _setterReturnsBoolean = other._setterReturnsBoolean;
+    _virtualSetterReturnsBoolean = other._virtualSetterReturnsBoolean;
+    _conflict = other._conflict;
+    return *this;
 }
 
 int TestProperties::getFieldValue()
@@ -618,7 +636,7 @@ int TestProperties::setterReturnsBoolean()
     return _setterReturnsBoolean;
 }
 
-bool TestProperties::setterReturnsBoolean(int value)
+bool TestProperties::setSetterReturnsBoolean(int value)
 {
     bool changed = _setterReturnsBoolean != value;
     _setterReturnsBoolean = value;
@@ -703,6 +721,16 @@ TestProperties::Conflict TestProperties::GetConflict()
 void TestProperties::SetConflict(Conflict conflict)
 {
     _conflict = conflict;
+}
+
+int(*TestProperties::getCallback())(int)
+{
+    return _callback;
+}
+
+void TestProperties::setCallback(int(*value)(int))
+{
+    _callback = value;
 }
 
 HasOverridenSetter::HasOverridenSetter()

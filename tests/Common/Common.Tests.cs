@@ -20,8 +20,9 @@ public class CommonTests : GeneratorTestFixture
         }
         Foo.NestedAbstract a;
         Foo.RenamedEmptyEnum.EmptyEnum1.GetHashCode();
-        using (var foo = new Foo())
+        using (var foo = new Foo(5))
         {
+            Assert.That(foo.B, Is.EqualTo(5));
             Bar bar = foo;
             Assert.IsTrue(Bar.Item.Item1 == bar);
 
@@ -51,14 +52,14 @@ public class CommonTests : GeneratorTestFixture
         {
             hasPropertyNamedAsParent.hasPropertyNamedAsParent.GetHashCode();
         }
-        EnumWithUnderscores e = EnumWithUnderscores.lOWER_BEFORE_CAPITAL;
-        e = EnumWithUnderscores.UnderscoreAtEnd;
-        e = EnumWithUnderscores.CAPITALS_More;
-        e = EnumWithUnderscores.UsesDigits1_0;
-        e.GetHashCode();
-        ItemsDifferByCase itemsDifferByCase = ItemsDifferByCase.Case_a;
-        itemsDifferByCase = ItemsDifferByCase.CaseA;
-        itemsDifferByCase.GetHashCode();
+        EnumWithUnderscores.lOWER_BEFORE_CAPITAL.GetHashCode();
+        EnumWithUnderscores.UnderscoreAtEnd.GetHashCode();
+        EnumWithUnderscores.CAPITALS_More.GetHashCode();
+        EnumWithUnderscores.UsesDigits1_0.GetHashCode();
+        ItemsDifferByCase.Case_a.GetHashCode();
+        ItemsDifferByCase.CaseA.GetHashCode();
+        Enum.NAME_A.GetHashCode();
+        Enum.NAME__A.GetHashCode();
         new AmbiguousParamNames(0, 0).Dispose();
         Common.SMallFollowedByCapital();
         Common.IntegerOverload(0);
@@ -551,14 +552,19 @@ public class CommonTests : GeneratorTestFixture
 
             prop.SetterReturnsBoolean = 35;
             Assert.That(prop.SetterReturnsBoolean, Is.EqualTo(35));
+            Assert.That(prop.SetSetterReturnsBoolean(35), Is.False);
+            Assert.That(prop.SetSetterReturnsBoolean(40), Is.True);
 
             prop.VirtualSetterReturnsBoolean = 45;
             Assert.That(prop.VirtualSetterReturnsBoolean, Is.EqualTo(45));
+            Assert.That(prop.SetVirtualSetterReturnsBoolean(45), Is.False);
+            Assert.That(prop.SetVirtualSetterReturnsBoolean(50), Is.True);
 
             Assert.That(prop.nestedEnum(), Is.EqualTo(5));
             Assert.That(prop.nestedEnum(55), Is.EqualTo(55));
 
             Assert.That(prop.Get32Bit, Is.EqualTo(10));
+            Assert.That(prop.ConstRefField, Is.EqualTo(prop.Field));
             Assert.That(prop.IsEmpty, Is.EqualTo(prop.Empty));
 
             Assert.That(prop.VirtualGetter, Is.EqualTo(15));
@@ -571,6 +577,9 @@ public class CommonTests : GeneratorTestFixture
             Assert.That(prop.conflict, Is.EqualTo(CommonTest.TestProperties.Conflict.Value1));
             prop.conflict = CommonTest.TestProperties.Conflict.Value2;
             Assert.That(prop.conflict, Is.EqualTo(CommonTest.TestProperties.Conflict.Value2));
+
+            prop.Callback = x => 4 * x;
+            Assert.That(prop.Callback(5), Is.EqualTo(20));
         }
         using (var prop = new HasOverridenSetter())
         {
