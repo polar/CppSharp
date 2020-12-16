@@ -128,7 +128,6 @@ namespace CppSharp.Generators.CSharp
                                         Context.ReturnVarName}[i];");
                             }
                         }
-                    }
                         supportBefore.UnindentAndWriteCloseBrace();
                         Context.Return.Write(value);
                     }

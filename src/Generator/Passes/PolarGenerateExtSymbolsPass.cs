@@ -14,21 +14,10 @@ namespace CppSharp.Passes
 {
     public class PolarGenerateExtSymbolsPass : TranslationUnitPass
     {
-        public PolarGenerateExtSymbolsPass()
-        {
-            VisitOptions.VisitClassBases = false;
-            VisitOptions.VisitClassFields = true;
-            VisitOptions.VisitClassTemplateSpecializations = false;
-            VisitOptions.VisitEventParameters = false;
-            VisitOptions.VisitFunctionParameters = false;
-            VisitOptions.VisitFunctionReturnType = false;
-            VisitOptions.VisitNamespaceEnums = false;
-            VisitOptions.VisitNamespaceEvents = false;
-            VisitOptions.VisitNamespaceTemplates = false;
-            VisitOptions.VisitNamespaceTypedefs = false;
-            VisitOptions.VisitNamespaceVariables = false;
-            VisitOptions.VisitTemplateArguments = false;
-        }
+
+        public PolarGenerateExtSymbolsPass() => VisitOptions.ResetFlags(
+            VisitFlags.ClassMethods | VisitFlags.ClassFields | VisitFlags.ClassProperties
+            );
 
 
         private Module extModule;
@@ -147,9 +136,9 @@ namespace CppSharp.Passes
             //System.Console.WriteLine($"UnspportedTemplateArgument {a.Type.Type} isIgnored {typeIgnoreChecker.IsIgnored}!");
             return typeIgnoreChecker.IsIgnored;
         }
-        // The purpuse of this class is to see if we need to specialize a vector class.
+        // The purpose of this class is to see if we need to specialize a vector class.
         // Since we are generating a library, we want all possible classes, so if one doesn't exist
-        // then add by returnning true.
+        // then add by returning true.
         private static bool IsVectorSpecializationNeeded(Declaration container,
             ITypeMapDatabase typeMaps, bool internalOnly, AST.Type type,
             ClassTemplateSpecialization specialization)
@@ -160,7 +149,7 @@ namespace CppSharp.Passes
             if (typeMap != null)
             {
                 var typePrinter = new CppSharp.Generators.CSharp.CSharpTypePrinter(typeMap.Context); 
-                //System.Console.WriteLine($"IsVectorSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
+                Diagnostics.Message($"IsVectorSpecializationNeeded: {specialization.Visit(typePrinter).Type}");
                 if (typeMap is CppSharp.Types.Ext.Vector)
                 {
                     if (specialization.TemplatedDecl.TemplatedClass.QualifiedOriginalName == "std::vector")
@@ -342,7 +331,7 @@ namespace CppSharp.Passes
                  (!method.IsConstructor || !((Class) method.Namespace).IsAbstract))) &&
                 // we cannot handle nested anonymous types
                 (!(function.Namespace is Class) || !string.IsNullOrEmpty(function.Namespace.OriginalName)) &&
-                !Context.Symbols.FindSymbol(ref mangled);
+                !Context.Symbols.FindLibraryBySymbol(mangled, out _);
         }
 
         private PolarSymbolsCodeGenerator GetSymbolsCodeGenerator(Module module)
@@ -433,20 +422,23 @@ namespace CppSharp.Passes
 
         private void CollectSymbols(string outputDir, string library)
         {
-            using (var parserOptions = new ParserOptions())
+            using (var linkerOptions = new LinkerOptions())
             {
-                parserOptions.AddLibraryDirs(outputDir);
+                linkerOptions.AddLibraryDirs(outputDir);
                 var output = GetOutputFile(library);
-                parserOptions.LibraryFile = output;
-                using (var parserResult = Parser.ClangParser.ParseLibrary(parserOptions))
+                linkerOptions.AddLibraries(output);
+                using (var parserResult = Parser.ClangParser.ParseLibrary(linkerOptions))
                 {
                     if (parserResult.Kind == ParserResultKind.Success)
                     {
-                        var nativeLibrary = ClangParser.ConvertLibrary(parserResult.Library);
                         lock (@lock)
                         {
-                            Context.Symbols.Libraries.Add(nativeLibrary);
-                            Context.Symbols.IndexSymbols();
+                            for (uint i = 0; i < parserResult.LibrariesCount; i++)
+                            {
+                                var nativeLibrary = ClangParser.ConvertLibrary(parserResult.GetLibraries(i));
+                                Context.Symbols.Libraries.Add(nativeLibrary);
+                                Context.Symbols.IndexSymbols();
+                            }
                         }
                     }
                     else

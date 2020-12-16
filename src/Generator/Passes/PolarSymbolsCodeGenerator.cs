@@ -38,6 +38,7 @@ namespace CppSharp.Passes
 
         public override bool VisitClassTemplateSpecializationDecl(ClassTemplateSpecialization specialization)
         {
+            System.Console.WriteLine($"template class {GetExporting()}{specialization.Visit(cppTypePrinter)};");
             WriteLine($"template class {GetExporting()}{specialization.Visit(cppTypePrinter)};");
             return true;
         }
@@ -46,6 +47,7 @@ namespace CppSharp.Passes
         {
             if (method.Namespace is ClassTemplateSpecialization)
             {
+                System.Console.WriteLine($"template {GetExporting()}{method.Visit(cppTypePrinter)};");
                 WriteLine($"template {GetExporting()}{method.Visit(cppTypePrinter)};");
                 return true;
             }

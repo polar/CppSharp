@@ -27,6 +27,7 @@ namespace CppSharp
 
             optionSet.Add("o=|output=", "the {PATH} for the generated bindings file (doesn't need the extension since it will depend on the generator)", v => HandleOutputArg(v, errorMessages) );
             optionSet.Add("on=|outputnamespace=", "the {NAMESPACE} that will be used for the generated code", on => driver.setOutputNamespace(on) );
+            optionSet.Add("d|debug", "enables debug mode which generates more verbose code to aid debugging", v => driver.SetDebug());
             optionSet.Add("p=|platform=", "the {PLATFORM} that the generated code will target: 'win', 'osx' or 'linux'", p => { GetDestinationPlatform(p, errorMessages); } );
             optionSet.Add("a=|arch=", "the {ARCHITECTURE} that the generated code will target: 'x86' or 'x64'", a => { GetDestinationArchitecture(a, errorMessages); } );
 
@@ -87,14 +88,13 @@ namespace CppSharp
             Console.WriteLine(" - If you specify the 'unitybuild' option then the generator will output a file for each given header file that will");
             Console.WriteLine("   contain only the bindings for that header file.");
         }
-        
 
         static void AddIncludeDirs(string dir, List<string> errorMessages)
         {
             if (Directory.Exists(dir))
                 driver.AddIncludeDirectory(dir);
             else
-                errorMessages.Add(string.Format("Directory '{0}' doesn't exist. Ignoring as include directory.", dir));
+                errorMessages.Add($"Directory '{dir}' doesn't exist. Ignoring as include directory.");
         }
 
         static void HandleOutputArg(string arg, List<string> errorMessages)
@@ -151,18 +151,14 @@ namespace CppSharp
         {
             if (!Path.IsPathRooted(args))
                 args = Path.Combine(Directory.GetCurrentDirectory(), args);
-            
+
             bool searchQuery = args.IndexOf('*') >= 0 || args.IndexOf('?') >= 0;
             try
             {
                 if (searchQuery || Directory.Exists(args))
-                {
                     GetFilesFromPath(args, errorMessages);
-                }
                 else if (File.Exists(args))
-                {
                     driver.AddSourceFiles(args);
-                }
                 else
                 {
                     errorMessages.Add($"File '{args}' could not be found.");
@@ -211,7 +207,7 @@ namespace CppSharp
             }
             catch (Exception)
             {
-                errorMessages.Add(string.Format("Error while looking for files inside path '{0}'. Ignoring.", path));
+                errorMessages.Add($"Error while looking for files inside path '{path}'. Ignoring.");
             }
         }
 
@@ -222,7 +218,7 @@ namespace CppSharp
 
         static void GetDestinationArchitecture(string architecture, List<string> errorMessages)
         {
-            driver.SetArchitecture(architecture.ToLower()); 
+            driver.SetArchitecture(architecture.ToLower());
         }
 
         static void PrintErrorMessages(List<string> errorMessages)
@@ -231,7 +227,7 @@ namespace CppSharp
                 Console.Error.WriteLine(m);
         }
 
-        static int Main(string[] args)
+        public static int Main(string[] args)
         {
             List<string> errorMessages = new List<string>();
             bool helpShown = false;
