@@ -276,7 +276,7 @@ namespace CppSharp.Types.Std
                 ctx.Return.Write($@"{qualifiedBasicString}Extensions.{
                     Helpers.InternalStruct}.{assign.Name}(new {
                     typePrinter.IntPtrType}(&{
-                    ctx.ReturnVarName}), {ctx.Parameter.Name})");
+                    ctx.ReturnVarName}), (string) (object) {ctx.Parameter.Name})");
                 ctx.ReturnVarName = string.Empty;
             }
             else
@@ -284,8 +284,9 @@ namespace CppSharp.Types.Std
                 var varBasicString = $"__basicString{ctx.ParameterIndex}";
                 ctx.Before.WriteLine($@"var {varBasicString} = new {
                     basicString.Visit(typePrinter)}();");
-                ctx.Before.WriteLine($@"{qualifiedBasicString}Extensions.{
-                    assign.Name}({varBasicString}, {ctx.Parameter.Name});");
+                if (!ctx.Parameter.IsOut)
+                    ctx.Before.WriteLine($@"{qualifiedBasicString}Extensions.{
+                        assign.Name}({varBasicString}, (string) (object) {ctx.Parameter.Name});");
                 ctx.Return.Write($"{varBasicString}.{Helpers.InstanceIdentifier}");
                 ctx.Cleanup.WriteLine($@"{varBasicString}.Dispose({
                     (!Type.IsAddress() || ctx.Parameter?.IsIndirect == true ? "false" : string.Empty)});");

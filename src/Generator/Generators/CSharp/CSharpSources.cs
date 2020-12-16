@@ -1175,7 +1175,7 @@ namespace CppSharp.Generators.CSharp
                 {
                     Method cctor = @class.Methods.First(c => c.IsCopyConstructor);
                     WriteLine($@"{TypePrinter.PrintNative(type)}.{
-                        GetFunctionNativeIdentifier(cctor)}({call}, {marshal.Context.Return});");
+                      GetFunctionNativeIdentifier(cctor)}({call}, {marshal.Context.Return});");
                 }
                 else
                 {
@@ -3127,6 +3127,23 @@ internal static{(@new ? " new" : string.Empty)} {printedClass} __GetInstance({Ty
             if (Context.PolarGenerateProfilingCode)
             {
                 WriteLine("__RequestContext.addCppTime();");
+            }
+
+            if (Context.PolarFixesEnabled)
+            {
+                foreach(ParamMarshal param in @params)
+                {
+                    if (param.Param.IsOut)
+                    {
+                        var paramType = param.Param.Type;
+                        var qualifiedIdentifier = (paramType.GetFinalPointee() ?? paramType).Visit(TypePrinter);
+
+                        if (qualifiedIdentifier == "string")
+                        {
+                            WriteLine("{0} = ({2}) CppSharp.Runtime.MarshalUtil.GetString(System.Text.Encoding.UTF8, {1});", param.Param.Name, param.Name, qualifiedIdentifier);
+                        }
+                    }
+                }
             }
 
             foreach (TextGenerator cleanup in from p in @params
